@@ -99,7 +99,7 @@ testHandlePutBuilder =
     testRecipe args =
       unsafePerformIO $ do
         let (UnicodeString a1, UnicodeString a2, UnicodeString a3, recipe) = args
-#if MIN_VERSION_base(4,5,0)
+#if MIN_VERSION_liquid_base(4,5,0)
             before  = a1
             between = a2
             after   = a3

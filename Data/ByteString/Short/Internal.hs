@@ -50,7 +50,7 @@ import Data.ByteString.Internal (ByteString(..), accursedUnutterablePerformIO, c
 
 import Data.Typeable    (Typeable)
 import Data.Data        (Data(..), mkNoRepType)
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 import Data.Semigroup   (Semigroup((<>)))
 #endif
 import Data.Monoid      (Monoid(..))
@@ -58,30 +58,30 @@ import Data.String      (IsString(..))
 import Control.DeepSeq  (NFData(..))
 import qualified Data.List as List (length)
 import Foreign.C.String (CString, CStringLen)
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,7,0)
 import Foreign.C.Types  (CSize(..), CInt(..))
-#elif MIN_VERSION_base(4,4,0)
+#elif MIN_VERSION_liquid_base(4,4,0)
 import Foreign.C.Types  (CSize(..), CInt(..), CLong(..))
 #else
 import Foreign.C.Types  (CSize, CInt, CLong)
 #endif
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.ForeignPtr (touchForeignPtr)
-#if MIN_VERSION_base(4,5,0)
+#if MIN_VERSION_liquid_base(4,5,0)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 #else
 import Foreign.ForeignPtr (unsafeForeignPtrToPtr)
 #endif
 import Foreign.Storable (pokeByteOff)
 
-#if MIN_VERSION_base(4,5,0)
+#if MIN_VERSION_liquid_base(4,5,0)
 import qualified GHC.Exts
 #endif
 import GHC.Exts ( Int(I#), Int#, Ptr(Ptr), Addr#, Char(C#)
                 , State#, RealWorld
                 , ByteArray#, MutableByteArray#
                 , newByteArray#
-#if MIN_VERSION_base(4,6,0)
+#if MIN_VERSION_liquid_base(4,6,0)
                 , newPinnedByteArray#
                 , byteArrayContents#
                 , unsafeCoerce#
@@ -91,7 +91,7 @@ import GHC.Exts ( Int(I#), Int#, Ptr(Ptr), Addr#, Char(C#)
                 , writeWord8Array#, writeCharArray#
                 , unsafeFreezeByteArray# )
 import GHC.IO
-#if MIN_VERSION_base(4,6,0)
+#if MIN_VERSION_liquid_base(4,6,0)
 import GHC.ForeignPtr (ForeignPtr(ForeignPtr), ForeignPtrContents(PlainPtr))
 #else
 import GHC.ForeignPtr (mallocPlainForeignPtrBytes)
@@ -136,14 +136,14 @@ instance Eq ShortByteString where
 instance Ord ShortByteString where
     compare = compareBytes
 
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 instance Semigroup ShortByteString where
     (<>)    = append
 #endif
 
 instance Monoid ShortByteString where
     mempty  = empty
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
     mappend = (<>)
 #else
     mappend = append
@@ -159,7 +159,7 @@ instance Show ShortByteString where
 instance Read ShortByteString where
     readsPrec p str = [ (packChars x, y) | (x, y) <- readsPrec p str ]
 
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,7,0)
 -- | @since 0.10.12.0
 instance GHC.Exts.IsList ShortByteString where
   type Item ShortByteString = Word8
@@ -270,7 +270,7 @@ fromShort !sbs = unsafeDupablePerformIO (fromShortIO sbs)
 
 fromShortIO :: ShortByteString -> IO ByteString
 fromShortIO sbs = do
-#if MIN_VERSION_base(4,6,0)
+#if MIN_VERSION_liquid_base(4,6,0)
     let len = length sbs
     mba@(MBA# mba#) <- stToIO (newPinnedByteArray len)
     stToIO (copyByteArray (asBA sbs) 0 mba 0 len)
@@ -480,7 +480,7 @@ newByteArray (I# len#) =
     ST $ \s -> case newByteArray# len# s of
                  (# s, mba# #) -> (# s, MBA# mba# #)
 
-#if MIN_VERSION_base(4,6,0)
+#if MIN_VERSION_liquid_base(4,6,0)
 newPinnedByteArray :: Int -> ST s (MBA s)
 newPinnedByteArray (I# len#) =
     ST $ \s -> case newPinnedByteArray# len# s of
@@ -547,7 +547,7 @@ copyByteArray#       :: ByteArray# -> Int#
                      -> Int#
                      -> State# s -> State# s
 
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,7,0)
 
 -- These exist as real primops in ghc-7.8, and for before that we use
 -- FFI to C memcpy.
@@ -605,7 +605,7 @@ csize :: Int# -> CSize
 csize i# = fromIntegral (I# i#)
 #endif
 
-#if MIN_VERSION_base(4,5,0)
+#if MIN_VERSION_liquid_base(4,5,0)
 copyByteArray# = GHC.Exts.copyByteArray#
 #else
 copyByteArray# src src_off dst dst_off len s =

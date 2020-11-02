@@ -95,7 +95,7 @@ caseWordSize_32_64 :: a -- Value to use for 32-bit 'Word's
                    -> a -- Value to use for 64-bit 'Word's
                    -> a
 caseWordSize_32_64 f32 f64 =
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,7,0)
   case finiteBitSize (undefined :: Word) of
 #else
   case bitSize (undefined :: Word) of

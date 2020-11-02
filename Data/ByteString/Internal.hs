@@ -99,7 +99,7 @@ import Foreign.ForeignPtr       (ForeignPtr, withForeignPtr)
 import Foreign.Ptr              (Ptr, FunPtr, plusPtr, minusPtr)
 import Foreign.Storable         (Storable(..))
 
-#if MIN_VERSION_base(4,5,0) || __GLASGOW_HASKELL__ >= 703
+#if MIN_VERSION_liquid_base(4,5,0) || __GLASGOW_HASKELL__ >= 703
 import Foreign.C.Types          (CInt(..), CSize(..))
 #else
 import Foreign.C.Types          (CInt, CSize)
@@ -107,15 +107,15 @@ import Foreign.C.Types          (CInt, CSize)
 
 import Foreign.C.String         (CString)
 
-#if MIN_VERSION_base(4,13,0)
+#if MIN_VERSION_liquid_base(4,13,0)
 import Data.Semigroup           (Semigroup (sconcat))
 import Data.List.NonEmpty       (NonEmpty ((:|)))
-#elif MIN_VERSION_base(4,9,0)
+#elif MIN_VERSION_liquid_base(4,9,0)
 import Data.Semigroup           (Semigroup ((<>), sconcat))
 import Data.List.NonEmpty       (NonEmpty ((:|)))
 #endif
 
-#if !(MIN_VERSION_base(4,8,0))
+#if !(MIN_VERSION_liquid_base(4,8,0))
 import Data.Monoid              (Monoid(..))
 #endif
 
@@ -134,11 +134,11 @@ import Data.Data                (Data(..), mkNoRepType)
 
 import GHC.Base                 (nullAddr#,realWorld#,unsafeChr)
 
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,7,0)
 import GHC.Exts                 (IsList(..))
 #endif
 
-#if MIN_VERSION_base(4,4,0)
+#if MIN_VERSION_liquid_base(4,4,0)
 import GHC.CString              (unpackCString#)
 #else
 import GHC.Base                 (unpackCString#)
@@ -158,7 +158,7 @@ import GHC.ForeignPtr           (ForeignPtr(ForeignPtr)
 #endif
                                 , mallocPlainForeignPtrBytes)
 
-#if MIN_VERSION_base(4,10,0)
+#if MIN_VERSION_liquid_base(4,10,0)
 import GHC.ForeignPtr           (plusForeignPtr)
 #else
 import GHC.Prim                 (plusAddr#)
@@ -178,7 +178,7 @@ import GHC.Types                (Int (..))
 -- CFILES stuff is Hugs only
 {-# CFILES cbits/fpstring.c #-}
 
-#if !MIN_VERSION_base(4,10,0)
+#if !MIN_VERSION_liquid_base(4,10,0)
 -- |Advances the given address by the given offset in bytes.
 --
 -- The new 'ForeignPtr' shares the finalizer of the original,
@@ -237,7 +237,7 @@ instance Eq  ByteString where
 instance Ord ByteString where
     compare = compareBytes
 
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 instance Semigroup ByteString where
     (<>)    = append
     sconcat (b:|bs) = concat (b:bs)
@@ -245,7 +245,7 @@ instance Semigroup ByteString where
 
 instance Monoid ByteString where
     mempty  = BS nullForeignPtr 0
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
     mappend = (<>)
 #else
     mappend = append
@@ -261,7 +261,7 @@ instance Show ByteString where
 instance Read ByteString where
     readsPrec p str = [ (packChars x, y) | (x, y) <- readsPrec p str ]
 
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,7,0)
 -- | @since 0.10.12.0
 instance IsList ByteString where
   type Item ByteString = Word8

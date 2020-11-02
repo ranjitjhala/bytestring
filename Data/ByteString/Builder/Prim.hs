@@ -474,8 +474,8 @@ import qualified Data.ByteString.Builder.Prim.Internal as I (size, sizeBound)
 import           Data.ByteString.Builder.Prim.Binary
 import           Data.ByteString.Builder.Prim.ASCII
 
-#if MIN_VERSION_base(4,4,0)
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,4,0)
+#if MIN_VERSION_liquid_base(4,7,0)
 import           Foreign
 import           Foreign.C.Types
 #else
@@ -683,7 +683,7 @@ primMapLazyByteStringBounded w =
 -- Raw CString encoding
 ------------------------------------------------------------------------------
 
-#if !MIN_VERSION_base(4,7,0)
+#if !MIN_VERSION_liquid_base(4,7,0)
 -- eqWord# et al. return Bools prior to GHC 7.6
 isTrue# :: Bool -> Bool
 isTrue# x = x

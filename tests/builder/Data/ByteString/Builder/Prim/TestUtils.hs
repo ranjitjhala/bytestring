@@ -74,7 +74,7 @@ import           Data.Char (chr, ord)
 
 import           Numeric (showHex)
 
-#if MIN_VERSION_base(4,4,0)
+#if MIN_VERSION_liquid_base(4,4,0)
 import Foreign hiding (unsafePerformIO)
 import System.IO.Unsafe (unsafePerformIO)
 #else

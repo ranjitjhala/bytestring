@@ -227,7 +227,7 @@ import qualified Data.ByteString.Internal as S
 import qualified Data.ByteString.Unsafe as S
 import Data.ByteString.Lazy.Internal
 
-#if !(MIN_VERSION_base(4,8,0))
+#if !(MIN_VERSION_liquid_base(4,8,0))
 import Control.Applicative      ((<$>))
 import Data.Monoid              (Monoid(..))
 #endif

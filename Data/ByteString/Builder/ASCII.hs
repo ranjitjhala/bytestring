@@ -96,7 +96,7 @@ import GHC.Num.Integer
 #define HAS_INTEGER_CONSTR 1
 #define IS S#
 
-# if !(MIN_VERSION_base(4,8,0))
+# if !(MIN_VERSION_liquid_base(4,8,0))
 import           Data.Monoid (mappend)
 # endif
 

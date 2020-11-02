@@ -56,14 +56,14 @@ import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Ptr (plusPtr)
 import Foreign.Storable (Storable(sizeOf))
 
-#if MIN_VERSION_base(4,13,0)
+#if MIN_VERSION_liquid_base(4,13,0)
 import Data.Semigroup   (Semigroup (sconcat))
 import Data.List.NonEmpty (NonEmpty ((:|)))
-#elif MIN_VERSION_base(4,9,0)
+#elif MIN_VERSION_liquid_base(4,9,0)
 import Data.Semigroup   (Semigroup ((<>), sconcat))
 import Data.List.NonEmpty (NonEmpty ((:|)))
 #endif
-#if !(MIN_VERSION_base(4,8,0))
+#if !(MIN_VERSION_liquid_base(4,8,0))
 import Data.Monoid      (Monoid(..))
 #endif
 import Control.DeepSeq  (NFData, rnf)
@@ -73,7 +73,7 @@ import Data.String      (IsString(..))
 import Data.Typeable            (Typeable)
 import Data.Data                (Data(..), mkNoRepType)
 
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,7,0)
 import GHC.Exts                 (IsList(..))
 #endif
 
@@ -94,7 +94,7 @@ instance Eq  ByteString where
 instance Ord ByteString where
     compare = cmp
 
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 instance Semigroup ByteString where
     (<>)    = append
     sconcat (b:|bs) = concat (b:bs)
@@ -102,7 +102,7 @@ instance Semigroup ByteString where
 
 instance Monoid ByteString where
     mempty  = Empty
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
     mappend = (<>)
 #else
     mappend = append
@@ -119,7 +119,7 @@ instance Show ByteString where
 instance Read ByteString where
     readsPrec p str = [ (packChars x, y) | (x, y) <- readsPrec p str ]
 
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,7,0)
 -- | @since 0.10.12.0
 instance IsList ByteString where
   type Item ByteString = Word8

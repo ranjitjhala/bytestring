@@ -221,12 +221,12 @@ import Prelude hiding           (reverse,head,tail,last,init,null
                                 ,readFile,writeFile,appendFile,replicate
                                 ,getContents,getLine,putStr,putStrLn,interact
                                 ,zip,zipWith,unzip,notElem
-#if !MIN_VERSION_base(4,6,0)
+#if !MIN_VERSION_liquid_base(4,6,0)
                                 ,catch
 #endif
                                 )
 
-#if MIN_VERSION_base(4,7,0)
+#if MIN_VERSION_liquid_base(4,7,0)
 import Data.Bits                (finiteBitSize, shiftL, (.|.), (.&.))
 #else
 import Data.Bits                (bitSize, shiftL, (.|.), (.&.))
@@ -246,7 +246,7 @@ import Control.Monad            (when)
 import Foreign.C.String         (CString, CStringLen)
 import Foreign.C.Types          (CSize)
 import Foreign.ForeignPtr       (ForeignPtr, withForeignPtr, touchForeignPtr)
-#if MIN_VERSION_base(4,5,0)
+#if MIN_VERSION_liquid_base(4,5,0)
 import Foreign.ForeignPtr.Unsafe(unsafeForeignPtrToPtr)
 #else
 import Foreign.ForeignPtr       (unsafeForeignPtrToPtr)
@@ -263,7 +263,7 @@ import System.IO                (stdin,stdout,hClose,hFileSize
                                 ,IOMode(..))
 import System.IO.Error          (mkIOError, illegalOperationErrorType)
 
-#if !(MIN_VERSION_base(4,8,0))
+#if !(MIN_VERSION_liquid_base(4,8,0))
 import Data.Monoid              (Monoid(..))
 #endif
 
@@ -281,7 +281,7 @@ import Foreign.Marshal.Utils    (copyBytes)
 import GHC.Base                 (build)
 import GHC.Word hiding (Word8)
 
-#if !(MIN_VERSION_base(4,7,0))
+#if !(MIN_VERSION_liquid_base(4,7,0))
 finiteBitSize = bitSize
 #endif
 
@@ -602,7 +602,7 @@ any f (BS x len) = accursedUnutterablePerformIO $ withForeignPtr x g
                                       else go (p `plusPtr` 1)
 {-# INLINE [1] any #-}
 
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 {-# RULES
 "ByteString specialise any (x ==)" forall x.
     any (x `eqWord8`) = anyByte x
@@ -643,7 +643,7 @@ all f (BS x len) = accursedUnutterablePerformIO $ withForeignPtr x g
                                   else return False
 {-# INLINE [1] all #-}
 
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 {-# RULES
 "ByteString specialise all (x /=)" forall x.
     all (x `neWord8`) = not . anyByte x
@@ -944,7 +944,7 @@ takeWhile :: (Word8 -> Bool) -> ByteString -> ByteString
 takeWhile f ps = unsafeTake (findIndexOrEnd (not . f) ps) ps
 {-# INLINE [1] takeWhile #-}
 
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 {-# RULES
 "ByteString specialise takeWhile (x /=)" forall x.
     takeWhile (x `neWord8`) = fst . breakByte x
@@ -985,7 +985,7 @@ dropWhile :: (Word8 -> Bool) -> ByteString -> ByteString
 dropWhile f ps = unsafeDrop (findIndexOrEnd (not . f) ps) ps
 {-# INLINE [1] dropWhile #-}
 
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 {-# RULES
 "ByteString specialise dropWhile (x /=)" forall x.
     dropWhile (x `neWord8`) = snd . breakByte x
@@ -1039,7 +1039,7 @@ break p ps = case findIndexOrEnd p ps of n -> (unsafeTake n ps, unsafeDrop n ps)
 {-# INLINE [1] break #-}
 
 -- See bytestring #70
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 {-# RULES
 "ByteString specialise break (x ==)" forall x.
     break (x `eqWord8`) = breakByte x
@@ -1107,7 +1107,7 @@ spanByte c ps@(BS x l) =
 {-# INLINE spanByte #-}
 
 -- See bytestring #70
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 {-# RULES
 "ByteString specialise span (x ==)" forall x.
     span (x `eqWord8`) = spanByte x
@@ -1378,7 +1378,7 @@ findIndices p ps = loop 0 ps
 {-# INLINE [1] findIndices #-}
 
 
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 {-# RULES
 "ByteString specialise findIndex (x ==)" forall x. findIndex (x`eqWord8`) = elemIndex x
 "ByteString specialise findIndex (== x)" forall x. findIndex (`eqWord8`x) = elemIndex x

@@ -2,6 +2,7 @@ GNUmakefile
 cabal-dev
 dist
 dist-install
+dist-newstyle
 ghc.mk
 .cabal-sandbox
 cabal.sandbox.config

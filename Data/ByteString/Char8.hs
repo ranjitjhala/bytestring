@@ -267,7 +267,7 @@ import Data.ByteString (empty,null,length,tail,init,append
 import Data.ByteString.Internal
 
 import Data.Char    ( isSpace )
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 -- See bytestring #70
 import GHC.Char (eqChar)
 #endif
@@ -539,7 +539,7 @@ break f = B.break (f . w2c)
 {-# INLINE [1] break #-}
 
 -- See bytestring #70
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 {-# RULES
 "ByteString specialise break (x==)" forall x.
     break (x `eqChar`) = breakChar x
@@ -706,7 +706,7 @@ findIndices :: (Char -> Bool) -> ByteString -> [Int]
 findIndices f = B.findIndices (f . w2c)
 {-# INLINE [1] findIndices #-}
 
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_liquid_base(4,9,0)
 {-# RULES
 "ByteString specialise findIndex (x==)" forall x.
     findIndex (x `eqChar`) = elemIndex x
