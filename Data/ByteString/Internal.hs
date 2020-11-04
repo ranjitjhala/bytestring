@@ -281,6 +281,7 @@ instance Data ByteString where
   gunfold _ _    = error "Data.ByteString.ByteString.gunfold"
   dataTypeOf _   = mkNoRepType "Data.ByteString.ByteString"
 
+{-@ assume error :: {v:_ | True} -> _ @-}
 ------------------------------------------------------------------------
 -- Packing and unpacking from lists
 
