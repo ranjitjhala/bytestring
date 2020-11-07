@@ -135,6 +135,7 @@ library bs
                      Data.ByteString.Builder
                      Data.ByteString.Builder.Extra
                      Data.ByteString.Builder.Prim
+                     Data.LiquidPtr
 
                      -- perhaps only exposed temporarily
                      Data.ByteString.Builder.Internal
@@ -155,6 +156,7 @@ library bs-lh
                     -fdicts-cheap
                     -fspec-constr-count=6
                     -fplugin=LiquidHaskell
+  cpp-options:      -DLIQUID
   exposed-modules:   Data.ByteString
                      Data.ByteString.Char8
                      Data.ByteString.Unsafe
@@ -168,6 +170,7 @@ library bs-lh
                      Data.ByteString.Builder
                      Data.ByteString.Builder.Extra
                      Data.ByteString.Builder.Prim
+                     Data.LiquidPtr
 
                      -- perhaps only exposed temporarily
                      Data.ByteString.Builder.Internal

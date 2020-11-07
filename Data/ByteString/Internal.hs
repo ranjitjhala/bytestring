@@ -10,6 +10,7 @@
 #endif
 {-# OPTIONS_HADDOCK not-home #-}
 
+
 -- |
 -- Module      : Data.ByteString.Internal
 -- Copyright   : (c) Don Stewart 2006-2008
@@ -95,9 +96,9 @@ module Data.ByteString.Internal (
 import Prelude hiding (concat, null)
 import qualified Data.List as List
 
-import Foreign.ForeignPtr       (ForeignPtr, withForeignPtr)
-import Foreign.Ptr              (Ptr, FunPtr, plusPtr, minusPtr)
-import Foreign.Storable         (Storable(..))
+import Foreign.ForeignPtr       (ForeignPtr) -- , withForeignPtr)
+import Foreign.Ptr              (Ptr, FunPtr) -- , plusPtr, minusPtr)
+import Foreign.Storable         (Storable) -- (..))
 
 #if MIN_VERSION_liquid_base(4,5,0) || __GLASGOW_HASKELL__ >= 703
 import Foreign.C.Types          (CInt(..), CSize(..))
@@ -159,7 +160,7 @@ import GHC.ForeignPtr           (ForeignPtr(ForeignPtr)
                                 , mallocPlainForeignPtrBytes)
 
 #if MIN_VERSION_liquid_base(4,10,0)
-import GHC.ForeignPtr           (plusForeignPtr)
+-- import GHC.ForeignPtr           (plusForeignPtr)
 #else
 import GHC.Prim                 (plusAddr#)
 #endif
@@ -168,7 +169,8 @@ import GHC.Prim                 (plusAddr#)
 import GHC.CString              (cstringLength#)
 import GHC.ForeignPtr           (ForeignPtrContents(FinalPtr))
 #else
-import GHC.Ptr                  (Ptr(..), castPtr)
+-- import GHC.Ptr                  (Ptr(..), castPtr)
+import Data.LiquidPtr
 #endif
 
 #if (__GLASGOW_HASKELL__ < 802) || (__GLASGOW_HASKELL__ >= 811)
@@ -210,6 +212,23 @@ data ByteString = BS {-# UNPACK #-} !(ForeignPtr Word8) -- payload
                      {-# UNPACK #-} !Int                -- length
     deriving (Typeable)
 
+{-@ predicate BSValid Payload Length = (Length <= fplen Payload) @-}
+
+{-@ measure bLength @-}
+{-@ bLength :: ByteString -> Nat @-}
+bLength :: ByteString -> Int
+bLength (BS _ l) = l
+
+{-@ type ByteStringN N  = {v : ByteString | bLength v == N} @-}
+{-@ type ByteStringLN N = {v : ByteString | bLength v <= N} @-}
+{-@ type ByteStringNE   = {v : ByteString | (bLength v) > 0} @-}
+
+{-@ 
+data ByteString [bLength]
+      = BS { payload :: ForeignPtr Word8
+           , length :: {v:Nat | BSValid payload v }
+           }
+@-}
 
 #if __GLASGOW_HASKELL__ >= 800
 -- |
@@ -298,17 +317,21 @@ packChars cs = unsafePackLenChars (List.length cs) cs
    packChars (unpackCString# s) = unsafePackLiteral s
  #-}
 
+{-@ unsafePackLenBytes :: l:Nat -> {ws:_ | len ws <= l} -> ByteStringN l @-}
 unsafePackLenBytes :: Int -> [Word8] -> ByteString
-unsafePackLenBytes len xs0 =
-    unsafeCreate len $ \p -> go p xs0
+unsafePackLenBytes wlen xs0 =
+    unsafeCreate wlen $ \p -> go p xs0
   where
+    {-@ go :: p:_ -> {bs:_ | len bs <= PtrSize p} -> _ @-}
     go !_ []     = return ()
-    go !p (x:xs) = poke p x >> go (p `plusPtr` 1) xs
+    go !pp (x:xs) = poke pp x >> go (pp `plusPtr` 1) xs
 
+{-@ unsafePackLenChars :: l:Nat -> {ws:_ | len ws <= l} -> ByteStringN l @-}
 unsafePackLenChars :: Int -> [Char] -> ByteString
-unsafePackLenChars len cs0 =
-    unsafeCreate len $ \p -> go p cs0
+unsafePackLenChars clen cs0 =
+    unsafeCreate clen $ \p -> go p cs0
   where
+    {-@ go :: p:_ -> {bs:_ | len bs <= PtrSize p} -> _ @-}
     go !_ []     = return ()
     go !p (c:cs) = poke p (c2w c) >> go (p `plusPtr` 1) cs
 
@@ -344,7 +367,7 @@ unsafePackAddress addr# = do
     return $ BS p (fromIntegral l)
   where
     cstr :: CString
-    cstr = Ptr addr#
+    cstr = mkPtr addr#
 #endif
 {-# INLINE unsafePackAddress #-}
 
@@ -358,25 +381,29 @@ unsafePackLiteral addr# =
 #if __GLASGOW_HASKELL__ >= 811
   BS (ForeignPtr addr# FinalPtr) (I# (cstringLength# addr#))
 #else
-  let len = accursedUnutterablePerformIO (c_strlen (Ptr addr#))
-   in BS (accursedUnutterablePerformIO (newForeignPtr_ (Ptr addr#))) (fromIntegral len)
+  let len = accursedUnutterablePerformIO (c_strlen (mkPtr addr#))
+   in BS (accursedUnutterablePerformIO (newForeignPtr_ (mkPtr addr#))) (fromIntegral len)
 #endif
 {-# INLINE unsafePackLiteral #-}
 
-
+{-@ packUptoLenBytes :: l:Nat -> _ -> (ByteStringLN l, _) @-}
 packUptoLenBytes :: Int -> [Word8] -> (ByteString, [Word8])
 packUptoLenBytes len xs0 =
     unsafeCreateUptoN' len $ \p0 ->
       let p_end = plusPtr p0 len
+          {-@ go :: p:PtrMid Word8 p0 p_end -> _ -> IO ({v:Nat|v <= len}, _) @-} 
           go !p []              = return (p `minusPtr` p0, [])
           go !p xs | p == p_end = return (len, xs)
           go !p (x:xs)          = poke p x >> go (p `plusPtr` 1) xs
       in go p0 xs0
 
+
+{-@ packUptoLenChars :: l:Nat -> _ -> (ByteStringLN l, _) @-}
 packUptoLenChars :: Int -> [Char] -> (ByteString, [Char])
 packUptoLenChars len cs0 =
     unsafeCreateUptoN' len $ \p0 ->
       let p_end = plusPtr p0 len
+          {-@ go :: PtrMid Word8 p0 p_end -> _ -> IO ({v:Nat|v <= len}, _) @-} 
           go !p []              = return (p `minusPtr` p0, [])
           go !p cs | p == p_end = return (len, cs)
           go !p (c:cs)          = poke p (c2w c) >> go (p `plusPtr` 1) cs
@@ -402,9 +429,11 @@ unpackChars bs = unpackAppendCharsLazy bs []
 unpackAppendBytesLazy :: ByteString -> [Word8] -> [Word8]
 unpackAppendBytesLazy (BS fp len) xs
   | len <= 100 = unpackAppendBytesStrict (BS fp len) xs
-  | otherwise  = unpackAppendBytesStrict (BS fp 100) remainder
+  | otherwise  = unpackAppendBytesStrict (BS fp 100) (remainder ()) 
   where
-    remainder  = unpackAppendBytesLazy (BS (plusForeignPtr fp 100) (len-100)) xs
+    remainder _ = unpackAppendBytesLazy (BS (plusForeignPtr fp 100) (len-100)) xs
+
+
 
   -- Why 100 bytes you ask? Because on a 64bit machine the list we allocate
   -- takes just shy of 4k which seems like a reasonable amount.
@@ -413,9 +442,9 @@ unpackAppendBytesLazy (BS fp len) xs
 unpackAppendCharsLazy :: ByteString -> [Char] -> [Char]
 unpackAppendCharsLazy (BS fp len) cs
   | len <= 100 = unpackAppendCharsStrict (BS fp len) cs
-  | otherwise  = unpackAppendCharsStrict (BS fp 100) remainder
+  | otherwise  = unpackAppendCharsStrict (BS fp 100) (remainder ())
   where
-    remainder  = unpackAppendCharsLazy (BS (plusForeignPtr fp 100) (len-100)) cs
+    remainder _ = unpackAppendCharsLazy (BS (plusForeignPtr fp 100) (len-100)) cs
 
 -- For these unpack functions, since we're unpacking the whole list strictly we
 -- build up the result list in an accumulator. This means we have to build up
@@ -426,7 +455,9 @@ unpackAppendBytesStrict :: ByteString -> [Word8] -> [Word8]
 unpackAppendBytesStrict (BS fp len) xs =
     accursedUnutterablePerformIO $ withForeignPtr fp $ \base ->
       loop (base `plusPtr` (-1)) (base `plusPtr` (-1+len)) xs
-  where
+  where 
+    {-@ loop :: {s:_ | s = (pbase s) - 1 && len <= plen (pbase s)} -> {p:_ | pbase p == pbase s && s <= p  && p <= s + len} -> _ -> _  / [p - s]@-}
+    loop :: Storable b => Ptr b -> Ptr b -> [b] -> IO [b]
     loop !sentinal !p acc
       | p == sentinal = return acc
       | otherwise     = do x <- peek p
@@ -437,6 +468,8 @@ unpackAppendCharsStrict (BS fp len) xs =
     accursedUnutterablePerformIO $ withForeignPtr fp $ \base ->
       loop (base `plusPtr` (-1)) (base `plusPtr` (-1+len)) xs
   where
+    {-@ loop :: {s:_ | s = (pbase s) - 1 && len <= plen (pbase s)} -> {p:_ | pbase p == pbase s && s <= p  && p <= s + len} -> _ -> _  / [p - s]@-}
+    loop :: Ptr Word8 -> Ptr Word8 -> [Char] -> IO [Char] 
     loop !sentinal !p acc
       | p == sentinal = return acc
       | otherwise     = do x <- peek p
@@ -451,6 +484,8 @@ nullForeignPtr = ForeignPtr nullAddr# FinalPtr
 #else
 nullForeignPtr = ForeignPtr nullAddr# (error "nullForeignPtr")
 #endif
+
+{-@ assume nullForeignPtr :: {p:_ | fplen p = 0} @-}
 
 -- ---------------------------------------------------------------------
 -- Low level constructors
@@ -486,6 +521,8 @@ toForeignPtr0 (BS ps l) = (ps, l)
 
 -- | A way of creating ByteStrings outside the IO monad. The @Int@
 -- argument gives the final size of the ByteString.
+
+{-@ unsafeCreate :: l:Nat -> ((Ptr0 Word8 l) -> IO ()) -> (ByteStringN l) @-}
 unsafeCreate :: Int -> (Ptr Word8 -> IO ()) -> ByteString
 unsafeCreate l f = unsafeDupablePerformIO (create l f)
 {-# INLINE unsafeCreate #-}
@@ -494,16 +531,19 @@ unsafeCreate l f = unsafeDupablePerformIO (create l f)
 -- ByteString, it is just an upper bound. The inner action returns
 -- the actual size. Unlike 'createAndTrim' the ByteString is not
 -- reallocated if the final size is less than the estimated size.
+{-@ unsafeCreateUptoN :: l:Nat -> (Ptr0 Word8 l -> IO {v:Nat | v <= l}) -> (ByteStringLN l) @-}
 unsafeCreateUptoN :: Int -> (Ptr Word8 -> IO Int) -> ByteString
 unsafeCreateUptoN l f = unsafeDupablePerformIO (createUptoN l f)
 {-# INLINE unsafeCreateUptoN #-}
 
 -- | @since 0.10.12.0
+{-@ unsafeCreateUptoN' :: l:Nat -> (Ptr0 Word8 l -> IO ({v:Nat | v <= l}, a)) -> (ByteStringLN l, a) @-}
 unsafeCreateUptoN' :: Int -> (Ptr Word8 -> IO (Int, a)) -> (ByteString, a)
 unsafeCreateUptoN' l f = unsafeDupablePerformIO (createUptoN' l f)
 {-# INLINE unsafeCreateUptoN' #-}
 
 -- | Create ByteString of size @l@ and use action @f@ to fill its contents.
+{-@ create :: l:Nat -> ((Ptr0 Word8 l) -> IO ()) -> IO (ByteStringN l)   @-}
 create :: Int -> (Ptr Word8 -> IO ()) -> IO ByteString
 create l f = do
     fp <- mallocByteString l
@@ -514,6 +554,8 @@ create l f = do
 -- | Given a maximum size @l@ and an action @f@ that fills the 'ByteString'
 -- starting at the given 'Ptr' and returns the actual utilized length,
 -- @`createUpToN'` l f@ returns the filled 'ByteString'.
+
+{-@ createUptoN :: l:Nat -> (Ptr0 Word8 l -> IO {v:Nat | v <= l}) -> IO (ByteStringLN l) @-}
 createUptoN :: Int -> (Ptr Word8 -> IO Int) -> IO ByteString
 createUptoN l f = do
     fp <- mallocByteString l
@@ -525,6 +567,7 @@ createUptoN l f = do
 -- action.
 --
 -- @since 0.10.12.0
+{-@ createUptoN' :: l:Nat -> (Ptr0 Word8 l -> IO ({v:Nat | v <= l}, a)) -> IO (ByteStringLN l, a) @-}
 createUptoN' :: Int -> (Ptr Word8 -> IO (Int, a)) -> IO (ByteString, a)
 createUptoN' l f = do
     fp <- mallocByteString l
@@ -563,6 +606,7 @@ createAndTrim' l f = do
 
 -- | Wrapper of 'Foreign.ForeignPtr.mallocForeignPtrBytes' with faster implementation for GHC
 --
+{-@ mallocByteString :: n:Nat -> IO (ForeignPtrN a n) @-}
 mallocByteString :: Int -> IO (ForeignPtr a)
 mallocByteString = mallocPlainForeignPtrBytes
 {-# INLINE mallocByteString #-}
@@ -733,7 +777,7 @@ accursedUnutterablePerformIO (IO m) = case m realWorld# of (# _, r #) -> r
 --
 -- Standard C functions
 --
-
+{-@ assume c_strlen :: c:_ -> IO {v:_ | 0 <= v && v <= PtrSize c} @-}
 foreign import ccall unsafe "string.h strlen" c_strlen
     :: CString -> IO CSize
 

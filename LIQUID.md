@@ -59,3 +59,13 @@ instance Data ByteString where
   dataTypeOf _   = mkNoRepType "Data.ByteString.ByteString"
 ```
 
+- add `cpp-options: -DLIQUID` so we can hack various type definitions
+
+- Write LIQUID (no UNPACK / !annot) versions of `FixedPrim a` and `BoundedPrim a` 
+  o.w. errors of the form `The types for the wrapper and worker data constructors cannot be merged`
+
+- Refined versions of `FixedPrim` and `BoundedPrim` and we're off onto `Data.Bytestring.Internal`
+
+## 11/5
+
+- ERROR in unsafePackLen (poke) --> unsafeCreate --> create 
