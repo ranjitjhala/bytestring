@@ -46,7 +46,12 @@ module Data.ByteString.Short.Internal (
     useAsCStringLen
   ) where
 
+import Data.LiquidPtr
 import Data.ByteString.Internal (ByteString(..), accursedUnutterablePerformIO, c_strlen)
+
+#ifdef LIQUID
+import Data.ByteString.Internal (ByteString(..), accursedUnutterablePerformIO, c_strlen, bsLen)
+#endif
 
 import Data.Typeable    (Typeable)
 import Data.Data        (Data(..), mkNoRepType)
@@ -174,9 +179,11 @@ instance IsString ShortByteString where
 
 instance Data ShortByteString where
   gfoldl f z txt = z packBytes `f` unpackBytes txt
-  toConstr _     = error "Data.ByteString.Short.ShortByteString.toConstr"
-  gunfold _ _    = error "Data.ByteString.Short.ShortByteString.gunfold"
+  toConstr _     = unsafeError "Data.ByteString.Short.ShortByteString.toConstr"
+  gunfold _ _    = unsafeError "Data.ByteString.Short.ShortByteString.gunfold"
   dataTypeOf _   = mkNoRepType "Data.ByteString.Short.ShortByteString"
+
+
 
 ------------------------------------------------------------------------
 -- Simple operations
@@ -186,6 +193,7 @@ empty :: ShortByteString
 empty = create 0 (\_ -> return ())
 
 -- | /O(1)/ The length of a 'ShortByteString'.
+{-@ assume length :: sbs:_ -> {v:Nat | v = sbsLen sbs} @-}
 length :: ShortByteString -> Int
 length (SBS barr#) = I# (sizeofByteArray# barr#)
 
@@ -194,10 +202,13 @@ null :: ShortByteString -> Bool
 null sbs = length sbs == 0
 
 -- | /O(1)/ 'ShortByteString' index (subscript) operator, starting from 0.
+{-@ index :: sbs:_ -> {i:Nat| i < sbsLen sbs} -> _ @-}
 index :: ShortByteString -> Int -> Word8
 index sbs i
   | i >= 0 && i < length sbs = unsafeIndex sbs i
   | otherwise                = indexError sbs i
+
+{-@ measure sbsLen :: ShortByteString -> Int @-}
 
 -- | /O(1)/ 'ShortByteString' index, starting from 0, that returns 'Just' if:
 --
@@ -222,6 +233,7 @@ indexMaybe sbs i
 unsafeIndex :: ShortByteString -> Int -> Word8
 unsafeIndex sbs = indexWord8Array (asBA sbs)
 
+{-@ indexError :: {v:_ | false} -> _ -> _ @-}
 indexError :: ShortByteString -> Int -> a
 indexError sbs i =
   error $ "Data.ByteString.Short.index: error in array index; " ++ show i
@@ -268,6 +280,7 @@ toShortIO (BS fptr len) = do
 fromShort :: ShortByteString -> ByteString
 fromShort !sbs = unsafeDupablePerformIO (fromShortIO sbs)
 
+{-@ ignore fromShortIO @-}
 fromShortIO :: ShortByteString -> IO ByteString
 fromShortIO sbs = do
 #if MIN_VERSION_liquid_base(4,6,0)
@@ -362,10 +375,10 @@ unpackAppendBytesLazy sbs ws0 = go 0 (length sbs) ws0
   where
     sz = 100
 
+    {-@ go :: off:Nat -> len:Nat -> _ -> _ / [len] @-}
     go off len ws
       | len <= sz = unpackAppendBytesStrict sbs off len ws
-      | otherwise = unpackAppendBytesStrict sbs off sz  remainder
-                      where remainder = go (off+sz) (len-sz) ws
+      | otherwise = unpackAppendBytesStrict sbs off sz  (go (off+sz) (len-sz) ws)
 
 -- For these unpack functions, since we're unpacking the whole list strictly we
 -- build up the result list in an accumulator. This means we have to build up
@@ -380,14 +393,15 @@ unpackAppendCharsStrict !sbs off len cs = go (off-1) (off-1 + len) cs
       | otherwise     = let !c = indexCharArray (asBA sbs) i
                         in go sentinal (i-1) (c:acc)
 
+{-@ unpackAppendBytesStrict :: _ -> _ -> Nat -> _ -> _ @-}
 unpackAppendBytesStrict :: ShortByteString -> Int -> Int -> [Word8] -> [Word8]
 unpackAppendBytesStrict !sbs off len ws = go (off-1) (off-1 + len) ws
   where
+    {-@ go :: s:_ -> {i:Int | s <= i} -> _ -> _ / [ i - s ] @-}
     go !sentinal !i !acc
       | i == sentinal = acc
       | otherwise     = let !w = indexWord8Array (asBA sbs) i
                          in go sentinal (i-1) (w:acc)
-
 
 ------------------------------------------------------------------------
 -- Eq and Ord implementations

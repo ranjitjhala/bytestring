@@ -1,7 +1,8 @@
 
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE CPP #-}
 
-{-@ LIQUID "--compile-spec" @-}
+{-@ liquid "--compile-spec" @-}
 
 module Data.LiquidPtr where 
 
@@ -11,13 +12,27 @@ import qualified Foreign.Storable
 import qualified Foreign.ForeignPtr
 import           GHC.Base (Addr#)
 
-{-@ embed GHC.Ptr.Ptr * as int @-}
+{-@ measure fst3 @-}
+fst3 :: (a, b, c) -> a
+fst3 (x, _, _) = x 
+
+{-@ measure snd3 @-}
+snd3 :: (a, b, c) -> b
+snd3 (_, x, _) = x 
+
+
+{-@ embed GHC.Ptr.Ptr *         as int @-}
+{-@ embed Foreign.C.Types.CSize as int @-}
+{-@ embed GHC.Word.Word64       as int @-}
+
 
 {-@ predicate PtrEnd  P = ((pbase P) + (plen (pbase P))) @-}
 
 {-@ predicate PtrSize P = ((PtrEnd P) - P) @-}
 
 {-@ predicate PtrValid P = ((pbase P) <= P && 0 < PtrSize P) @-}
+
+{-@ predicate PtrValidN P N = ((pbase P) <= P && N < PtrSize P) @-}
 
 {-@ type PtrOk a = {p:Ptr a | PtrValid p} @-}
 {-@ type Ptr0 a N = {p:Ptr a | p = pbase p && plen p = N} @-}
@@ -28,13 +43,10 @@ import           GHC.Base (Addr#)
 withForeignPtr :: GHC.ForeignPtr.ForeignPtr a -> (GHC.Ptr.Ptr a -> IO b) -> IO b
 withForeignPtr = Foreign.ForeignPtr.withForeignPtr
 
--- predicate PValid P N         = ((0 <= N) && (N < (plen P)))
---
--- Foreign.Storable.peekByteOff :: (Foreign.Storable.Storable a)
---                              => forall b. p:(GHC.Ptr.Ptr b)
---                              -> {v:GHC.Types.Int | (PValid p v)}
---                              -> (GHC.Types.IO a)
---
+{-@ peekByteOff :: (Foreign.Storable.Storable a) => p:(GHC.Ptr.Ptr b) -> {n:Nat | PtrValidN p n} -> IO a @-}
+peekByteOff :: (Foreign.Storable.Storable a) => GHC.Ptr.Ptr b -> Int -> IO a
+peekByteOff = Foreign.Storable.peekByteOff
+
 -- Foreign.Storable.pokeByteOff :: (Foreign.Storable.Storable a)
 --                              => forall b. p:(GHC.Ptr.Ptr b)
 --                              -> {v:GHC.Types.Int | (PValid p v)}
@@ -72,3 +84,14 @@ mkPtr = GHC.Ptr.Ptr
   @-}
 plusForeignPtr :: GHC.ForeignPtr.ForeignPtr a -> Int -> GHC.ForeignPtr.ForeignPtr b
 plusForeignPtr = GHC.ForeignPtr.plusForeignPtr
+
+-------------------
+-- Foreign.Concurrent
+
+-- newForeignPtr :: GHC.Ptr.Ptr a -> IO () -> IO (GHC.ForeignPtr.ForeignPtr a)
+-- newForeignPtr = undefined
+
+-------------------
+
+unsafeError :: [Char] -> a
+unsafeError = error

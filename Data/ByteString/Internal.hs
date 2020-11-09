@@ -10,6 +10,7 @@
 #endif
 {-# OPTIONS_HADDOCK not-home #-}
 
+{-@ liquid "--prune-unsorted" @-}
 
 -- |
 -- Module      : Data.ByteString.Internal
@@ -88,6 +89,9 @@ module Data.ByteString.Internal (
 
         -- * Deprecated and unmentionable
         accursedUnutterablePerformIO, -- :: IO a -> a
+
+        bsLen,
+        bsLengths,
 
         -- * Exported compatibility shim
         plusForeignPtr
@@ -208,27 +212,32 @@ plusForeignPtr (ForeignPtr addr guts) (I# offset) = ForeignPtr (plusAddr# addr o
 -- "Data.ByteString.Char8" it can be interpreted as containing 8-bit
 -- characters.
 --
+#ifdef LIQUID
+data ByteString = BS (ForeignPtr Word8) -- payload
+                     Int                -- length
+    deriving (Typeable)
+#else
 data ByteString = BS {-# UNPACK #-} !(ForeignPtr Word8) -- payload
                      {-# UNPACK #-} !Int                -- length
     deriving (Typeable)
+#endif
 
 {-@ predicate BSValid Payload Length = (Length <= fplen Payload) @-}
 
-{-@ measure bLength @-}
-{-@ bLength :: ByteString -> Nat @-}
-bLength :: ByteString -> Int
-bLength (BS _ l) = l
+{-@ measure bsLen @-}
+{-@ bsLen :: ByteString -> Nat @-}
+bsLen :: ByteString -> Int
+bsLen (BS _ l) = l
 
-{-@ type ByteStringN N  = {v : ByteString | bLength v == N} @-}
-{-@ type ByteStringLN N = {v : ByteString | bLength v <= N} @-}
-{-@ type ByteStringNE   = {v : ByteString | (bLength v) > 0} @-}
+{-@ type ByteStringN N  = {v : ByteString | bsLen v == N} @-}
+{-@ type ByteStringLN N = {v : ByteString | bsLen v <= N} @-}
+{-@ type ByteStringNE   = {v : ByteString | bsLen v  > 0} @-}
 
-{-@ 
-data ByteString [bLength]
+{-@ data ByteString [bsLen]
       = BS { payload :: ForeignPtr Word8
            , length :: {v:Nat | BSValid payload v }
            }
-@-}
+  @-}
 
 #if __GLASGOW_HASKELL__ >= 800
 -- |
@@ -426,6 +435,7 @@ unpackBytes bs = unpackAppendBytesLazy bs []
 unpackChars :: ByteString -> [Char]
 unpackChars bs = unpackAppendCharsLazy bs []
 
+{-@ unpackAppendBytesLazy :: bs:_ -> _ -> _ / [bsLen bs] @-}
 unpackAppendBytesLazy :: ByteString -> [Word8] -> [Word8]
 unpackAppendBytesLazy (BS fp len) xs
   | len <= 100 = unpackAppendBytesStrict (BS fp len) xs
@@ -439,6 +449,7 @@ unpackAppendBytesLazy (BS fp len) xs
   -- takes just shy of 4k which seems like a reasonable amount.
   -- (5 words per list element, 8 bytes per word, 100 elements = 4000 bytes)
 
+{-@ unpackAppendCharsLazy :: bs:_ -> _ -> _ / [bsLen bs] @-}
 unpackAppendCharsLazy :: ByteString -> [Char] -> [Char]
 unpackAppendCharsLazy (BS fp len) cs
   | len <= 100 = unpackAppendCharsStrict (BS fp len) cs
@@ -496,6 +507,7 @@ nullForeignPtr = ForeignPtr nullAddr# (error "nullForeignPtr")
 -- 'Data.ByteString.Unsafe.unsafePackCStringLen' or
 -- 'Data.ByteString.Unsafe.unsafePackCStringFinalizer' instead.
 --
+{-@ fromForeignPtr :: fp:ForeignPtr Word8 -> off:Nat -> {n:Nat | off + n <= fplen fp }  -> ByteStringN n @-}
 fromForeignPtr :: ForeignPtr Word8
                -> Int -- ^ Offset
                -> Int -- ^ Length
@@ -503,6 +515,7 @@ fromForeignPtr :: ForeignPtr Word8
 fromForeignPtr fp o len = BS (plusForeignPtr fp o) len
 {-# INLINE fromForeignPtr #-}
 
+{-@ fromForeignPtr0 :: fp:ForeignPtr Word8 -> {n:Nat | n <= fplen fp}  -> ByteStringN n @-}
 fromForeignPtr0 :: ForeignPtr Word8
                -> Int -- ^ Length
                -> ByteString
@@ -510,11 +523,13 @@ fromForeignPtr0 = BS
 {-# INLINE fromForeignPtr0 #-}
 
 -- | /O(1)/ Deconstruct a ForeignPtr from a ByteString
+{-@ toForeignPtr :: bs:_ -> ({fp:_ | bsLen bs <= fplen fp}, {v:Int | v = 0}, {v:Nat| v = bsLen bs}) @-}
 toForeignPtr :: ByteString -> (ForeignPtr Word8, Int, Int) -- ^ (ptr, offset, length)
 toForeignPtr (BS ps l) = (ps, 0, l)
 {-# INLINE toForeignPtr #-}
 
 -- | /O(1)/ Deconstruct a ForeignPtr from a ByteString
+{-@ toForeignPtr0 :: bs:_ -> ({fp:_ | bsLen bs <= fplen fp}, {v:Nat| v = bsLen bs}) @-}
 toForeignPtr0 :: ByteString -> (ForeignPtr Word8, Int) -- ^ (ptr, length)
 toForeignPtr0 (BS ps l) = (ps, l)
 {-# INLINE toForeignPtr0 #-}
@@ -583,6 +598,7 @@ createUptoN' l f = do
 -- createAndTrim is the main mechanism for creating custom, efficient
 -- ByteString functions, using Haskell or C functions to fill the space.
 --
+{-@ createAndTrim :: l:Nat -> (Ptr Word8 -> IO {l':Nat | l' <= l}) -> IO (ByteStringLN l) @-}
 createAndTrim :: Int -> (Ptr Word8 -> IO Int) -> IO ByteString
 createAndTrim l f = do
     fp <- mallocByteString l
@@ -593,6 +609,8 @@ createAndTrim l f = do
             else create l' $ \p' -> memcpy p' p l'
 {-# INLINE createAndTrim #-}
 
+
+{-@ createAndTrim' :: l:Nat -> (p:Ptr Word8 -> IO {v:(Nat, {l':Nat | l' <= l}, a) | fst3 v + snd3 v <= PtrSize p}) -> IO (ByteStringLN l, a) @-}
 createAndTrim' :: Int -> (Ptr Word8 -> IO (Int, Int, a)) -> IO (ByteString, a)
 createAndTrim' l f = do
     fp <- mallocByteString l
@@ -662,29 +680,45 @@ concat = \bss0 -> goLen0 bss0 bss0
     -- closures which would result in unnecessary closure allocation.
   where
     -- It's still possible that the result is empty
-    goLen0 _    []                     = mempty
+    {-@ goLen0 :: bss0:_ -> {bss:_ | bsLengths bss0 = bsLengths bss} -> _ @-}
+    goLen0 :: [ByteString] -> [ByteString] -> ByteString
+    goLen0 _    []                   = mempty
     goLen0 bss0 (BS _ 0     :bss)    = goLen0 bss0 bss
-    goLen0 bss0 (bs           :bss)    = goLen1 bss0 bs bss
+    goLen0 bss0 (bs           :bss)  = goLen1 bss0 bs bss
 
     -- It's still possible that the result is a single chunk
-    goLen1 _    bs []                  = bs
+    {-@ goLen1 :: bss0:_ -> bs:_ -> {bss:_ | bsLengths bss0 = bsLen bs + bsLengths bss} -> _ @-}
+    goLen1 _    bs []                = bs
     goLen1 bss0 bs (BS _ 0  :bss)    = goLen1 bss0 bs bss
     goLen1 bss0 bs (BS _ len:bss)    = goLen bss0 (checkedAdd "concat" len' len) bss
       where BS _ len' = bs
 
     -- General case, just find the total length we'll need
+    {-@ goLen :: bss0:_ -> total:Nat -> {bss:_ | bsLengths bss0 = bsLengths bss + total} -> _ @-}
+    goLen :: [ByteString] -> Int -> [ByteString] -> ByteString
     goLen bss0 !total (BS _ len:bss) = goLen bss0 total' bss
       where total' = checkedAdd "concat" total len
     goLen bss0 total [] =
       unsafeCreate total $ \ptr -> goCopy bss0 ptr
 
     -- Copy the data
+    {-@ goCopy :: bs:_ -> {p:_ | bsLengths bs <= PtrSize p}  -> _ @-}
+    goCopy :: [ByteString] -> Ptr Word8 -> IO () 
     goCopy []                  !_   = return ()
     goCopy (BS _  0  :bss) !ptr = goCopy bss ptr
     goCopy (BS fp len:bss) !ptr = do
       withForeignPtr fp $ \p -> memcpy ptr p len
       goCopy bss (ptr `plusPtr` len)
 {-# NOINLINE concat #-}
+
+
+{-@ measure bsLengths @-}
+{-@ bsLengths :: [ByteString] -> Nat @-}
+bsLengths :: [ByteString] -> Int
+bsLengths [] = 0
+bsLengths (b:bs) = bsLen b + bsLengths bs
+
+{- LIQUID "--prune-unsorted" @-}
 
 {-# RULES
 "ByteString concat [] -> mempty"
@@ -694,6 +728,7 @@ concat = \bss0 -> goLen0 bss0 bss0
  #-}
 
 -- | Add two non-negative numbers. Errors out on overflow.
+{-@ checkedAdd :: String -> x:Nat -> y:Nat -> {v:Nat | v = x + y} @-}
 checkedAdd :: String -> Int -> Int -> Int
 checkedAdd fun x y
   | r >= 0    = r
@@ -777,6 +812,9 @@ accursedUnutterablePerformIO (IO m) = case m realWorld# of (# _, r #) -> r
 --
 -- Standard C functions
 --
+{-@ embed Foreign.C.Types.CSize as int @-}
+{-@ embed GHC.Word.Word64       as int @-}
+
 {-@ assume c_strlen :: c:_ -> IO {v:_ | 0 <= v && v <= PtrSize c} @-}
 foreign import ccall unsafe "string.h strlen" c_strlen
     :: CString -> IO CSize
@@ -799,6 +837,7 @@ memcmp p q s = c_memcmp p q (fromIntegral s)
 foreign import ccall unsafe "string.h memcpy" c_memcpy
     :: Ptr Word8 -> Ptr Word8 -> CSize -> IO (Ptr Word8)
 
+{-@ memcpy :: dst:Ptr Word8 -> src:Ptr Word8 -> {n:Nat | n <= PtrSize dst  && n <= PtrSize src } -> IO () @-}
 memcpy :: Ptr Word8 -> Ptr Word8 -> Int -> IO ()
 memcpy p q s = c_memcpy p q (fromIntegral s) >> return ()
 

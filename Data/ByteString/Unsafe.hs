@@ -50,10 +50,10 @@ module Data.ByteString.Unsafe (
 
 import Data.ByteString.Internal
 
-import Foreign.ForeignPtr       (newForeignPtr_, newForeignPtr, withForeignPtr)
-import Foreign.Ptr              (Ptr, castPtr)
+import Foreign.ForeignPtr       (newForeignPtr_, newForeignPtr) -- , withForeignPtr)
+import Foreign.Ptr              (Ptr) -- , castPtr)
 
-import Foreign.Storable         (Storable(..))
+-- import Foreign.Storable         (Storable) -- (..))
 import Foreign.C.String         (CString, CStringLen)
 
 import Control.Exception        (assert)
@@ -66,6 +66,11 @@ import qualified Foreign.Concurrent as FC (newForeignPtr)
 import GHC.Prim                 (Addr#)
 import GHC.Ptr                  (Ptr(..))
 
+import Data.LiquidPtr
+import GHC.Word (Word64)
+
+{-@ embed GHC.Word.Word64       as int @-}
+
 -- ---------------------------------------------------------------------
 --
 -- Extensions to the basic interface
@@ -74,6 +79,7 @@ import GHC.Ptr                  (Ptr(..))
 -- | A variety of 'head' for non-empty ByteStrings. 'unsafeHead' omits the
 -- check for the empty case, so there is an obligation on the programmer
 -- to provide a proof that the ByteString is non-empty.
+{-@ unsafeHead :: ByteStringNE -> Word8 @-}
 unsafeHead :: ByteString -> Word8
 unsafeHead (BS x l) = assert (l > 0) $
     accursedUnutterablePerformIO $ withForeignPtr x $ \p -> peek p
@@ -82,6 +88,7 @@ unsafeHead (BS x l) = assert (l > 0) $
 -- | A variety of 'tail' for non-empty ByteStrings. 'unsafeTail' omits the
 -- check for the empty case. As with 'unsafeHead', the programmer must
 -- provide a separate proof that the ByteString is non-empty.
+{-@ unsafeTail :: b:ByteStringNE -> ByteStringN {bsLen b - 1} @-}
 unsafeTail :: ByteString -> ByteString
 unsafeTail (BS ps l) = assert (l > 0) $ BS (plusForeignPtr ps 1) (l-1)
 {-# INLINE unsafeTail #-}
@@ -89,6 +96,7 @@ unsafeTail (BS ps l) = assert (l > 0) $ BS (plusForeignPtr ps 1) (l-1)
 -- | A variety of 'init' for non-empty ByteStrings. 'unsafeInit' omits the
 -- check for the empty case. As with 'unsafeHead', the programmer must
 -- provide a separate proof that the ByteString is non-empty.
+{-@ unsafeInit :: b:ByteStringNE -> ByteStringN {bsLen b - 1} @-}
 unsafeInit :: ByteString -> ByteString
 unsafeInit (BS ps l) = assert (l > 0) $ BS ps (l-1)
 {-# INLINE unsafeInit #-}
@@ -96,6 +104,7 @@ unsafeInit (BS ps l) = assert (l > 0) $ BS ps (l-1)
 -- | A variety of 'last' for non-empty ByteStrings. 'unsafeLast' omits the
 -- check for the empty case. As with 'unsafeHead', the programmer must
 -- provide a separate proof that the ByteString is non-empty.
+{-@ unsafeLast :: ByteStringNE -> Word8 @-}
 unsafeLast :: ByteString -> Word8
 unsafeLast (BS x l) = assert (l > 0) $
     accursedUnutterablePerformIO $ withForeignPtr x $ \p -> peekByteOff p (l-1)
@@ -105,6 +114,7 @@ unsafeLast (BS x l) = assert (l > 0) $
 -- This omits the bounds check, which means there is an accompanying
 -- obligation on the programmer to ensure the bounds are checked in some
 -- other way.
+{-@ unsafeIndex :: b:ByteString -> {i:Nat| i < bsLen b} -> Word8 @-}
 unsafeIndex :: ByteString -> Int -> Word8
 unsafeIndex (BS x l) i = assert (i >= 0 && i < l) $
     accursedUnutterablePerformIO $ withForeignPtr x $ \p -> peekByteOff p i
@@ -112,12 +122,14 @@ unsafeIndex (BS x l) i = assert (i >= 0 && i < l) $
 
 -- | A variety of 'take' which omits the checks on @n@ so there is an
 -- obligation on the programmer to provide a proof that @0 <= n <= 'length' xs@.
+{-@ unsafeTake :: n:Nat -> {b:ByteString | n <= bsLen b} -> ByteStringN n @-}
 unsafeTake :: Int -> ByteString -> ByteString
 unsafeTake n (BS x l) = assert (0 <= n && n <= l) $ BS x n
 {-# INLINE unsafeTake #-}
 
 -- | A variety of 'drop' which omits the checks on @n@ so there is an
 -- obligation on the programmer to provide a proof that @0 <= n <= 'length' xs@.
+{-@ unsafeDrop :: n:Nat -> {b:ByteString | n <= bsLen b} -> ByteStringN { bsLen b - n } @-}
 unsafeDrop  :: Int -> ByteString -> ByteString
 unsafeDrop n (BS x l) = assert (0 <= n && n <= l) $ BS (plusForeignPtr x n) (l-n)
 {-# INLINE unsafeDrop #-}
@@ -140,9 +152,10 @@ unsafeDrop n (BS x l) = assert (0 <= n && n <= l) $ BS (plusForeignPtr x n) (l-n
 --
 -- If in doubt, don't use this function.
 --
+{-@ unsafePackAddressLen :: n:Nat -> {a:_|n <= addrLen a}  -> IO (ByteStringN n) @-}
 unsafePackAddressLen :: Int -> Addr# -> IO ByteString
 unsafePackAddressLen len addr# = do
-    p <- newForeignPtr_ (Ptr addr#)
+    p <- newForeignPtr_ (mkPtr addr#)
     return $ BS p len
 {-# INLINE unsafePackAddressLen #-}
 
@@ -155,10 +168,14 @@ unsafePackAddressLen len addr# = do
 -- first argument. Any changes to the original buffer will be reflected
 -- in the resulting 'ByteString'.
 --
+{-@ unsafePackCStringFinalizer :: p:PtrOk Word8 -> {l:Nat | l <= PtrSize p} -> IO () -> IO (ByteStringN l) @-}
 unsafePackCStringFinalizer :: Ptr Word8 -> Int -> IO () -> IO ByteString
 unsafePackCStringFinalizer p l f = do
     fp <- FC.newForeignPtr p f
     return $ BS fp l
+
+{-@ assume Foreign.Concurrent.newForeignPtr :: p:(PtrOk a) -> IO () -> IO (ForeignPtrN a (PtrSize p)) @-}
+
 
 -- | Explicitly run the finaliser associated with a 'ByteString'.
 -- References to this value after finalisation may generate invalid memory

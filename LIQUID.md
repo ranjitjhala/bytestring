@@ -1,35 +1,22 @@
 
-
-## LH Benchmarks
-Tests/Benchmarks/bytestring/Data/ByteString.hs, 45.2544, True
-Tests/Benchmarks/bytestring/Data/ByteString/Unsafe.hs, 2.4628, True
-Tests/Benchmarks/bytestring/Data/ByteString/LazyZip.hs, 95.9668, True
-Tests/Benchmarks/bytestring/Data/ByteString/Lazy.hs, 77.7830, True
-Tests/Benchmarks/bytestring/Data/ByteString/Internal.hs, 5.1267, True
-Tests/Benchmarks/bytestring/Data/ByteString/Fusion.hs, 15.2251, True
-Tests/Benchmarks/bytestring/Data/ByteString/Char8.hs, 7.7081, True
-Tests/Benchmarks/bytestring/Data/ByteString/Lazy/Internal.hs, 1.5104, True
-Tests/Benchmarks/bytestring/Data/ByteString/Lazy/Char8.hs, 8.9567, True
-
 ## Bytestring
 
 [ 1 of 20] Data.ByteString.Builder.Prim.Internal
 [ 2 of 20] Data.ByteString.Builder.Prim.Internal.Floating
 [ 3 of 20] Data.ByteString.Builder.Prim.Internal.UncheckedShifts
 [ 4 of 20] Data.ByteString.Builder.Prim.Binary
-
 [ 5 of 20] >> Data.ByteString.Internal
 [ 6 of 20] >> Data.ByteString.Lazy.Internal
-
 [ 7 of 20] Data.ByteString.Short.Internal
-[ 8 of 20] Data.ByteString.Short
+  * TODO lots of stuff with funky arrays that we have no specs for
 
+[ 8 of 20] Data.ByteString.Short
 [ 9 of 20] >> Data.ByteString.Unsafe
+
 [10 of 20] >> Data.ByteString 
 [11 of 20] >> Data.ByteString.Lazy
 [12 of 20] >> Data.ByteString.Lazy.Char8
 [13 of 20] >> Data.ByteString.Char8
-
 [14 of 20] Data.ByteString.Builder.Prim.Internal.Base16
 [15 of 20] Data.ByteString.Builder.Prim.ASCII
 [16 of 20] Data.ByteString.Builder.Internal

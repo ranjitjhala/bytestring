@@ -5,18 +5,19 @@ benchmarks: False
 source-repository-package
     type: git
     location: https://github.com/ucsd-progsys/liquidhaskell
-    tag: c06fd0b141054d04614af0ce3015d055a7980bce
+    tag: 012d923374d74bd37b1881fa2bfdb7389897add3
+
 
 source-repository-package
     type: git
     location: https://github.com/ucsd-progsys/liquidhaskell
-    tag: c06fd0b141054d04614af0ce3015d055a7980bce
+    tag: 012d923374d74bd37b1881fa2bfdb7389897add3
     subdir: liquid-base
 
 source-repository-package
     type: git
     location: https://github.com/ucsd-progsys/liquidhaskell
-    tag: c06fd0b141054d04614af0ce3015d055a7980bce
+    tag: 012d923374d74bd37b1881fa2bfdb7389897add3
     subdir: liquid-ghc-prim
 
 source-repository-package

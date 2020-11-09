@@ -274,7 +274,7 @@ import GHC.Char (eqChar)
 import qualified Data.List as List (intersperse)
 
 import System.IO    (Handle,stdout)
-import Foreign
+import Foreign hiding (plusForeignPtr)
 
 
 ------------------------------------------------------------------------

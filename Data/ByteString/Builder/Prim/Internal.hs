@@ -76,12 +76,6 @@ import Prelude hiding (maxBound)
 #define CONLIKE
 #endif
 
-
-#ifdef LIQUID
-silly :: Int
-silly = 1 -- [1,2,3]
-#endif
-
 ------------------------------------------------------------------------------
 -- Supporting infrastructure
 ------------------------------------------------------------------------------
