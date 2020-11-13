@@ -159,7 +159,7 @@ import GHC.IOBase               (IO(IO),RawBuffer,unsafeDupablePerformIO)
 
 import GHC.ForeignPtr           (ForeignPtr(ForeignPtr)
 #if __GLASGOW_HASKELL__ < 900
-                                , newForeignPtr_
+                                -- , newForeignPtr_
 #endif
                                 , mallocPlainForeignPtrBytes)
 

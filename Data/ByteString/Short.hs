@@ -92,3 +92,10 @@ module Data.ByteString.Short (
 import Data.ByteString.Short.Internal
 import Prelude ()
 
+#ifdef LIQUID
+import GHC.Foreign
+import Data.LiquidPtr
+import GHC.Word (Word64)
+import Data.ByteString.Internal 
+{-@ embed GHC.Word.Word64       as int @-}
+#endif

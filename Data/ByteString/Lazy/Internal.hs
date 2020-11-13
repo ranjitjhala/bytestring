@@ -52,8 +52,6 @@ import Prelude hiding (concat)
 import qualified Data.ByteString.Internal as S
 
 import Data.Word (Word8)
-import Foreign.ForeignPtr (withForeignPtr)
-import Foreign.Ptr (plusPtr)
 import Foreign.Storable (Storable(sizeOf))
 
 #if MIN_VERSION_liquid_base(4,13,0)
@@ -75,6 +73,16 @@ import Data.Data                (Data(..), mkNoRepType)
 
 #if MIN_VERSION_liquid_base(4,7,0)
 import GHC.Exts                 (IsList(..))
+#endif
+
+#ifdef LIQUID
+import GHC.Foreign
+import Data.LiquidPtr
+import GHC.Word (Word64)
+{-@ embed GHC.Word.Word64 as int @-}
+#else
+import Foreign.ForeignPtr (withForeignPtr)
+import Foreign.Ptr (plusPtr)
 #endif
 
 -- | A space-efficient representation of a 'Word8' vector, supporting many

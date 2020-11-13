@@ -50,7 +50,7 @@ module Data.ByteString.Unsafe (
 
 import Data.ByteString.Internal
 
-import Foreign.ForeignPtr       (newForeignPtr_, newForeignPtr) -- , withForeignPtr)
+import Foreign.ForeignPtr       (newForeignPtr) -- newForeignPtr_, withForeignPtr)
 import Foreign.Ptr              (Ptr) -- , castPtr)
 
 -- import Foreign.Storable         (Storable) -- (..))
@@ -64,7 +64,7 @@ import qualified Foreign.ForeignPtr as FC (finalizeForeignPtr)
 import qualified Foreign.Concurrent as FC (newForeignPtr)
 
 import GHC.Prim                 (Addr#)
-import GHC.Ptr                  (Ptr(..))
+-- import GHC.Ptr                  (Ptr(..))
 
 import Data.LiquidPtr
 import GHC.Word (Word64)
@@ -216,6 +216,7 @@ unsafePackCString cstr = do
 -- modified, this change will be reflected in the resulting 'ByteString',
 -- breaking referential transparency.
 --
+{-@ unsafePackCStringLen :: {cs:_ | 0 <= snd cs && snd cs <= PtrSize (fst cs)} -> IO (ByteStringN {snd cs}) @-}
 unsafePackCStringLen :: CStringLen -> IO ByteString
 unsafePackCStringLen (ptr,len) = do
     fp <- newForeignPtr_ (castPtr ptr)
@@ -238,6 +239,7 @@ unsafePackMallocCString cstr = do
     len <- c_strlen cstr
     return $! BS fp (fromIntegral len)
 
+{-@ assume newForeignPtr :: _ -> p:Ptr a -> IO ({fp: ForeignPtr a | fplen fp = PtrSize p})  @-}
 -- | /O(1)/ Build a 'ByteString' from a malloced 'CStringLen'. This
 -- value will have a @free(3)@ finalizer associated to it.
 --
@@ -249,6 +251,7 @@ unsafePackMallocCString cstr = do
 -- which will result in a /double free/ error, or if you pass it
 -- a 'CString' not allocated with 'Foreign.Marshal.Alloc.malloc'.
 --
+{-@ unsafePackMallocCStringLen :: {cs:_ | 0 <= snd cs && snd cs <= PtrSize (fst cs)} -> IO (ByteStringN {snd cs}) @-}
 unsafePackMallocCStringLen :: CStringLen -> IO ByteString
 unsafePackMallocCStringLen (cstr, len) = do
     fp <- newForeignPtr c_free_finalizer (castPtr cstr)

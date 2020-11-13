@@ -38,7 +38,12 @@ snd3 (_, x, _) = x
 {-@ type Ptr0 a N = {p:Ptr a | p = pbase p && plen p = N} @-}
 {-@ type PtrMid a L R = {p:Ptr a | pbase p == pbase L && L <= p && p <= R } @-}
 
-{-@ ignore withForeignPtr @-}
+
+
+{-@ newForeignPtr_ :: p:_ -> IO {fp:_ | fplen fp = PtrSize p} @-}
+newForeignPtr_ :: GHC.Ptr.Ptr a -> IO (Foreign.ForeignPtr.ForeignPtr a)
+newForeignPtr_ = GHC.ForeignPtr.newForeignPtr_
+
 {-@ withForeignPtr ::  fp:(GHC.ForeignPtr.ForeignPtr a) -> ((Ptr0 a (fplen fp)) -> IO b) -> IO b @-}
 withForeignPtr :: GHC.ForeignPtr.ForeignPtr a -> (GHC.Ptr.Ptr a -> IO b) -> IO b
 withForeignPtr = Foreign.ForeignPtr.withForeignPtr
@@ -87,7 +92,6 @@ plusForeignPtr = GHC.ForeignPtr.plusForeignPtr
 
 -------------------
 -- Foreign.Concurrent
-
 -- newForeignPtr :: GHC.Ptr.Ptr a -> IO () -> IO (GHC.ForeignPtr.ForeignPtr a)
 -- newForeignPtr = undefined
 
