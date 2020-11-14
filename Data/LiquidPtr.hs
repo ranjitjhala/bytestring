@@ -20,6 +20,13 @@ fst3 (x, _, _) = x
 snd3 :: (a, b, c) -> b
 snd3 (_, x, _) = x 
 
+{-@ inline myMin @-}
+myMin :: (Ord a) => a -> a -> a
+myMin x y = if x <= y then x else y
+
+{-@ inline myMax @-}
+myMax :: (Ord a) => a -> a -> a
+myMax x y = if y <= x then x else y
 
 {-@ embed GHC.Ptr.Ptr *         as int @-}
 {-@ embed Foreign.C.Types.CSize as int @-}

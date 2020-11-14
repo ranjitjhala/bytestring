@@ -142,8 +142,13 @@ instance IsString ByteString where
 
 instance Data ByteString where
   gfoldl f z txt = z packBytes `f` unpackBytes txt
+#ifdef LIQUID
+  toConstr _     = unsafeError "Data.ByteString.Lazy.ByteString.toConstr"
+  gunfold _ _    = unsafeError "Data.ByteString.Lazy.ByteString.gunfold"
+#else 
   toConstr _     = error "Data.ByteString.Lazy.ByteString.toConstr"
   gunfold _ _    = error "Data.ByteString.Lazy.ByteString.gunfold"
+#endif
   dataTypeOf _   = mkNoRepType "Data.ByteString.Lazy.ByteString"
 
 ------------------------------------------------------------------------

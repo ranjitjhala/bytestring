@@ -56,3 +56,33 @@ instance Data ByteString where
 ## 11/5
 
 - ERROR in unsafePackLen (poke) --> unsafeCreate --> create 
+
+
+--
+
+## 11/14
+
+`Data.ByteString.Lazy.Internal.packBytes` -> `S.packUptoLenBytes` --> `createUptoN'` 
+
+
+
+```haskell
+data Box = B Int
+
+{-@ measure bVal @-}
+bVal :: Box -> Int
+bVal (B n) = n
+
+{-@ mkBox :: forall <p :: Int -> Bool, q :: Box -> Bool>. 
+                { n :: Int <p> |- {b : Box | bVal b = n} <: {b: Box<q> | True}}
+                (() -> IO (Int<p>)) -> IO (Box<q>)
+  @-}
+mkBox :: (() -> IO Int) -> IO Box
+mkBox f = do
+    n <- f ()
+    return (B n)
+
+{-@ test :: k:Int -> IO ({b:Box | k < bVal b}) @-}
+test :: Int -> IO Box
+test k = mkBox (\_ -> return (k + 100))
+```

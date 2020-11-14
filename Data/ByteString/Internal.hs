@@ -395,26 +395,33 @@ unsafePackLiteral addr# =
 #endif
 {-# INLINE unsafePackLiteral #-}
 
-{-@ packUptoLenBytes :: l:Nat -> _ -> (ByteStringLN l, _) @-}
+-- {-@ packUptoLenBytes :: l:Nat -> xs0:_ -> (ByteStringLN l, _) @-}
+{-@ packUptoLenBytes :: l:Nat -> xs0:_ -> (ByteStringN {myMin l (len xs0)}, Rest _ l xs0) @-}
 packUptoLenBytes :: Int -> [Word8] -> (ByteString, [Word8])
-packUptoLenBytes len xs0 =
-    unsafeCreateUptoN' len $ \p0 ->
-      let p_end = plusPtr p0 len
-          {-@ go :: p:PtrMid Word8 p0 p_end -> _ -> IO ({v:Nat|v <= len}, _) @-} 
+packUptoLenBytes len_ xs0 =
+    unsafeCreateUptoN' len_ $ \p0 ->
+      let p_end = plusPtr p0 len_
+          {-@ go :: p:PtrMid Word8 p0 p_end -> {xs:_ | (p - p0) + len xs = len xs0 } -> 
+                    IO (NatN {myMin len_ (len xs0)}, Rest _ len_ xs0) @-} 
           go !p []              = return (p `minusPtr` p0, [])
-          go !p xs | p == p_end = return (len, xs)
+          go !p xs | p == p_end = return (len_, xs)
           go !p (x:xs)          = poke p x >> go (p `plusPtr` 1) xs
       in go p0 xs0
 
+{-@ type NatN N      = {v:Nat | v = N} @-}
+{-@ type Min    L Xs = {v:Nat | v = myMin L (len Xs)} @-}
+{-@ type Rest a L Xs = {v:[a] | len v = myMax 0 ((len Xs) - L)} @-}
 
-{-@ packUptoLenChars :: l:Nat -> _ -> (ByteStringLN l, _) @-}
+-- {-@ packUptoLenChars :: l:Nat -> _ -> (ByteStringLN l, _) @-}
+{-@ packUptoLenChars :: l:Nat -> cs0:_ -> (ByteStringN {myMin l (len cs0)}, Rest _ l cs0) @-}
 packUptoLenChars :: Int -> [Char] -> (ByteString, [Char])
-packUptoLenChars len cs0 =
-    unsafeCreateUptoN' len $ \p0 ->
-      let p_end = plusPtr p0 len
-          {-@ go :: PtrMid Word8 p0 p_end -> _ -> IO ({v:Nat|v <= len}, _) @-} 
+packUptoLenChars len_ cs0 =
+    unsafeCreateUptoN' len_ $ \p0 ->
+      let p_end = plusPtr p0 len_
+          {-@ go :: p:PtrMid Word8 p0 p_end -> {cs:_ | (p - p0) + len cs = len cs0 } -> 
+                    IO (NatN {myMin len_ (len cs0)}, Rest _ len_ cs0) @-}
           go !p []              = return (p `minusPtr` p0, [])
-          go !p cs | p == p_end = return (len, cs)
+          go !p cs | p == p_end = return (len_, cs)
           go !p (c:cs)          = poke p (c2w c) >> go (p `plusPtr` 1) cs
       in go p0 cs0
 
@@ -546,13 +553,25 @@ unsafeCreate l f = unsafeDupablePerformIO (create l f)
 -- ByteString, it is just an upper bound. The inner action returns
 -- the actual size. Unlike 'createAndTrim' the ByteString is not
 -- reallocated if the final size is less than the estimated size.
-{-@ unsafeCreateUptoN :: l:Nat -> (Ptr0 Word8 l -> IO {v:Nat | v <= l}) -> (ByteStringLN l) @-}
+{- unsafeCreateUptoN :: l:Nat -> (Ptr0 Word8 l -> IO {v:Nat | v <= l}) -> (ByteStringLN l) @-}
+{-@ unsafeCreateUptoN :: 
+      forall <p :: Int -> Bool, q :: ByteString -> Bool>.
+        { n :: Int <p> |- {b : ByteString | bsLen b = n} <: {b: ByteString<q> | True}}
+        l:Nat -> (Ptr0 Word8 l -> IO ({v:Int<p> | 0 <= v && v <= l})) -> 
+        ({b:ByteString<q> | bsLen b <= l}) 
+  @-}
 unsafeCreateUptoN :: Int -> (Ptr Word8 -> IO Int) -> ByteString
 unsafeCreateUptoN l f = unsafeDupablePerformIO (createUptoN l f)
 {-# INLINE unsafeCreateUptoN #-}
 
 -- | @since 0.10.12.0
-{-@ unsafeCreateUptoN' :: l:Nat -> (Ptr0 Word8 l -> IO ({v:Nat | v <= l}, a)) -> (ByteStringLN l, a) @-}
+{- unsafeCreateUptoN' :: l:Nat -> (Ptr0 Word8 l -> IO ({v:Nat | v <= l}, a)) -> (ByteStringLN l, a) @-}
+{-@ unsafeCreateUptoN' :: 
+      forall <p :: Int -> Bool, q :: ByteString -> Bool>.
+        { n :: Int <p> |- {b : ByteString | bsLen b = n} <: {b: ByteString<q> | True}}
+        l:Nat -> (Ptr0 Word8 l -> IO ({v:Int<p> | 0 <= v && v <= l}, a)) -> 
+        ({b:ByteString<q> | bsLen b <= l}, a) 
+  @-}
 unsafeCreateUptoN' :: Int -> (Ptr Word8 -> IO (Int, a)) -> (ByteString, a)
 unsafeCreateUptoN' l f = unsafeDupablePerformIO (createUptoN' l f)
 {-# INLINE unsafeCreateUptoN' #-}
@@ -569,8 +588,12 @@ create l f = do
 -- | Given a maximum size @l@ and an action @f@ that fills the 'ByteString'
 -- starting at the given 'Ptr' and returns the actual utilized length,
 -- @`createUpToN'` l f@ returns the filled 'ByteString'.
-
-{-@ createUptoN :: l:Nat -> (Ptr0 Word8 l -> IO {v:Nat | v <= l}) -> IO (ByteStringLN l) @-}
+{- createUptoN :: l:Nat -> (Ptr0 Word8 l -> IO {v:Nat | v <= l}) -> IO (ByteStringLN l) @-}
+{-@ createUptoN :: forall <p :: Int -> Bool, q :: ByteString -> Bool>.
+                      { n :: Int <p> |- {b : ByteString | bsLen b = n} <: {b: ByteString<q> | True}}
+                      l:Nat -> (Ptr0 Word8 l -> IO ({v:Int<p> | 0 <= v && v <= l})) -> 
+                      IO ({b:ByteString<q> | bsLen b <= l}) 
+  @-}
 createUptoN :: Int -> (Ptr Word8 -> IO Int) -> IO ByteString
 createUptoN l f = do
     fp <- mallocByteString l
@@ -582,7 +605,11 @@ createUptoN l f = do
 -- action.
 --
 -- @since 0.10.12.0
-{-@ createUptoN' :: l:Nat -> (Ptr0 Word8 l -> IO ({v:Nat | v <= l}, a)) -> IO (ByteStringLN l, a) @-}
+{-@ createUptoN' :: forall <p :: Int -> Bool, q :: ByteString -> Bool>.
+                      { n :: Int <p> |- {b : ByteString | bsLen b = n} <: {b: ByteString<q> | True}}
+                      l:Nat -> (Ptr0 Word8 l -> IO ({v:Int<p> | 0 <= v && v <= l}, a)) -> 
+                      IO ({b:ByteString<q> | bsLen b <= l}, a) 
+  @-}
 createUptoN' :: Int -> (Ptr Word8 -> IO (Int, a)) -> IO (ByteString, a)
 createUptoN' l f = do
     fp <- mallocByteString l
