@@ -91,7 +91,7 @@ module Data.ByteString.Internal (
         accursedUnutterablePerformIO, -- :: IO a -> a
 
         bsLen,
-        bsLengths,
+        bsLens,
 
         -- * Exported compatibility shim
         plusForeignPtr
@@ -442,7 +442,7 @@ unpackBytes bs = unpackAppendBytesLazy bs []
 unpackChars :: ByteString -> [Char]
 unpackChars bs = unpackAppendCharsLazy bs []
 
-{-@ unpackAppendBytesLazy :: bs:_ -> _ -> _ / [bsLen bs] @-}
+{-@ unpackAppendBytesLazy :: bs:_ -> xs:_ -> {v:_ | len v = bsLen bs + len xs} / [bsLen bs] @-}
 unpackAppendBytesLazy :: ByteString -> [Word8] -> [Word8]
 unpackAppendBytesLazy (BS fp len) xs
   | len <= 100 = unpackAppendBytesStrict (BS fp len) xs
@@ -456,7 +456,7 @@ unpackAppendBytesLazy (BS fp len) xs
   -- takes just shy of 4k which seems like a reasonable amount.
   -- (5 words per list element, 8 bytes per word, 100 elements = 4000 bytes)
 
-{-@ unpackAppendCharsLazy :: bs:_ -> _ -> _ / [bsLen bs] @-}
+{-@ unpackAppendCharsLazy :: bs:_ -> xs:_ -> {v:_ | len v = bsLen bs + len xs} / [bsLen bs] @-}
 unpackAppendCharsLazy :: ByteString -> [Char] -> [Char]
 unpackAppendCharsLazy (BS fp len) cs
   | len <= 100 = unpackAppendCharsStrict (BS fp len) cs
@@ -469,24 +469,36 @@ unpackAppendCharsLazy (BS fp len) cs
 -- the list starting at the end. So our traversal starts at the end of the
 -- buffer and loops down until we hit the sentinal:
 
+{-@ unpackAppendBytesStrict :: b:_ -> xs:_  -> {v:_ | len v = len xs + bsLen b} @-}
 unpackAppendBytesStrict :: ByteString -> [Word8] -> [Word8]
-unpackAppendBytesStrict (BS fp len) xs =
+unpackAppendBytesStrict (BS fp len_) xs =
     accursedUnutterablePerformIO $ withForeignPtr fp $ \base ->
-      loop (base `plusPtr` (-1)) (base `plusPtr` (-1+len)) xs
+      loop (base `plusPtr` (-1)) (base `plusPtr` (-1+len_)) xs
   where 
-    {-@ loop :: {s:_ | s = (pbase s) - 1 && len <= plen (pbase s)} -> {p:_ | pbase p == pbase s && s <= p  && p <= s + len} -> _ -> _  / [p - s]@-}
+    {-@ loop :: {s:_ | s = (pbase s) - 1 && len_ <= plen (pbase s)} -> 
+                {p:_ | pbase p == pbase s && s <= p  && p <= s + len_} -> 
+                {acc:_ | len acc = len xs + s + len_ - p }-> 
+                IO ({v:_ | len v = len xs + len_ }) 
+                / [p - s] 
+      @-}
     loop :: Storable b => Ptr b -> Ptr b -> [b] -> IO [b]
     loop !sentinal !p acc
       | p == sentinal = return acc
       | otherwise     = do x <- peek p
                            loop sentinal (p `plusPtr` (-1)) (x:acc)
 
+{-@ unpackAppendCharsStrict :: b:_ -> xs:_  -> {v:_ | len v = len xs + bsLen b} @-}
 unpackAppendCharsStrict :: ByteString -> [Char] -> [Char]
-unpackAppendCharsStrict (BS fp len) xs =
+unpackAppendCharsStrict (BS fp len_) xs =
     accursedUnutterablePerformIO $ withForeignPtr fp $ \base ->
-      loop (base `plusPtr` (-1)) (base `plusPtr` (-1+len)) xs
+      loop (base `plusPtr` (-1)) (base `plusPtr` (-1+len_)) xs
   where
-    {-@ loop :: {s:_ | s = (pbase s) - 1 && len <= plen (pbase s)} -> {p:_ | pbase p == pbase s && s <= p  && p <= s + len} -> _ -> _  / [p - s]@-}
+    {-@ loop :: {s:_ | s = (pbase s) - 1 && len_ <= plen (pbase s)} -> 
+                {p:_ | pbase p == pbase s && s <= p  && p <= s + len_} -> 
+                {acc:_ | len acc = len xs + s + len_ - p }-> 
+                IO ({v:_ | len v = len xs + len_ }) 
+                / [p - s] 
+      @-}
     loop :: Ptr Word8 -> Ptr Word8 -> [Char] -> IO [Char] 
     loop !sentinal !p acc
       | p == sentinal = return acc
@@ -707,21 +719,21 @@ concat = \bss0 -> goLen0 bss0 bss0
     -- closures which would result in unnecessary closure allocation.
   where
     -- It's still possible that the result is empty
-    {-@ goLen0 :: bss0:_ -> {bss:_ | bsLengths bss0 = bsLengths bss} -> _ @-}
+    {-@ goLen0 :: bss0:_ -> {bss:_ | bsLens bss0 = bsLens bss} -> _ @-}
     goLen0 :: [ByteString] -> [ByteString] -> ByteString
     goLen0 _    []                   = mempty
     goLen0 bss0 (BS _ 0     :bss)    = goLen0 bss0 bss
     goLen0 bss0 (bs           :bss)  = goLen1 bss0 bs bss
 
     -- It's still possible that the result is a single chunk
-    {-@ goLen1 :: bss0:_ -> bs:_ -> {bss:_ | bsLengths bss0 = bsLen bs + bsLengths bss} -> _ @-}
+    {-@ goLen1 :: bss0:_ -> bs:_ -> {bss:_ | bsLens bss0 = bsLen bs + bsLens bss} -> _ @-}
     goLen1 _    bs []                = bs
     goLen1 bss0 bs (BS _ 0  :bss)    = goLen1 bss0 bs bss
     goLen1 bss0 bs (BS _ len:bss)    = goLen bss0 (checkedAdd "concat" len' len) bss
       where BS _ len' = bs
 
     -- General case, just find the total length we'll need
-    {-@ goLen :: bss0:_ -> total:Nat -> {bss:_ | bsLengths bss0 = bsLengths bss + total} -> _ @-}
+    {-@ goLen :: bss0:_ -> total:Nat -> {bss:_ | bsLens bss0 = bsLens bss + total} -> _ @-}
     goLen :: [ByteString] -> Int -> [ByteString] -> ByteString
     goLen bss0 !total (BS _ len:bss) = goLen bss0 total' bss
       where total' = checkedAdd "concat" total len
@@ -729,7 +741,7 @@ concat = \bss0 -> goLen0 bss0 bss0
       unsafeCreate total $ \ptr -> goCopy bss0 ptr
 
     -- Copy the data
-    {-@ goCopy :: bs:_ -> {p:_ | bsLengths bs <= PtrSize p}  -> _ @-}
+    {-@ goCopy :: bs:_ -> {p:_ | bsLens bs <= PtrSize p}  -> _ @-}
     goCopy :: [ByteString] -> Ptr Word8 -> IO () 
     goCopy []                  !_   = return ()
     goCopy (BS _  0  :bss) !ptr = goCopy bss ptr
@@ -739,11 +751,11 @@ concat = \bss0 -> goLen0 bss0 bss0
 {-# NOINLINE concat #-}
 
 
-{-@ measure bsLengths @-}
-{-@ bsLengths :: [ByteString] -> Nat @-}
-bsLengths :: [ByteString] -> Int
-bsLengths [] = 0
-bsLengths (b:bs) = bsLen b + bsLengths bs
+{-@ measure bsLens @-}
+{-@ bsLens :: [ByteString] -> Nat @-}
+bsLens :: [ByteString] -> Int
+bsLens [] = 0
+bsLens (b:bs) = bsLen b + bsLens bs
 
 {- LIQUID "--prune-unsorted" @-}
 

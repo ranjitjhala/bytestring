@@ -45,7 +45,7 @@ myMax x y = if y <= x then x else y
 {-@ type Ptr0 a N = {p:Ptr a | p = pbase p && plen p = N} @-}
 {-@ type PtrMid a L R = {p:Ptr a | pbase p == pbase L && L <= p && p <= R } @-}
 
-
+{-@ type Pos = {v:Int | 0 < v} @-}
 
 {-@ newForeignPtr_ :: p:_ -> IO {fp:_ | fplen fp = PtrSize p} @-}
 newForeignPtr_ :: GHC.Ptr.Ptr a -> IO (Foreign.ForeignPtr.ForeignPtr a)

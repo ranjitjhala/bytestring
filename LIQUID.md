@@ -62,9 +62,10 @@ instance Data ByteString where
 
 ## 11/14
 
-`Data.ByteString.Lazy.Internal.packBytes` -> `S.packUptoLenBytes` --> `createUptoN'` 
-
-
+- needs fancy absref `Data.ByteString.Lazy.Internal.packBytes` -> `S.packUptoLenBytes` --> `createUptoN'` 
+- cannot associate `lbsLen` with B.Lazy.Internal.Bytestring -- ODD crash with `len` ?
+- ghcid swallows up `Termination Error` fix the printout
+- STOP: `Lazy.Internal.toStrict` which is super fun, and like `Internal.concat`
 
 ```haskell
 data Box = B Int

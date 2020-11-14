@@ -7,6 +7,7 @@
 #endif
 {-# OPTIONS_HADDOCK not-home #-}
 
+{-@ liquid "--prune-unsorted" @-}
 -- |
 -- Module      : Data.ByteString.Lazy.Internal
 -- Copyright   : (c) Don Stewart 2006-2008
@@ -44,6 +45,9 @@ module Data.ByteString.Lazy.Internal (
         unpackBytes, unpackChars,
         -- * Conversions with strict ByteString
         fromStrict, toStrict,
+
+        lbsLen, 
+        lbsLens
 
   ) where
 
@@ -92,9 +96,29 @@ import Foreign.Ptr (plusPtr)
 -- from "Data.ByteString.Lazy.Char8" it can be interpreted as containing
 -- 8-bit characters.
 --
+#ifdef LIQUID
+data ByteString = Empty | Chunk S.ByteString ByteString
+    deriving (Typeable)
+#else
 data ByteString = Empty | Chunk {-# UNPACK #-} !S.ByteString ByteString
     deriving (Typeable)
+#endif
 -- See 'invariant' function later in this module for internal invariants.
+
+{-@ type LByteStringN N = {v:ByteString | lbsLen v = N} @-}
+
+{-@ data ByteString
+      = Empty 
+      | Chunk { lbHead :: {v:S.ByteString | 0 < bsLen v }, lbTail :: ByteString } 
+  @-}
+
+{-@ measure lbsLen @-}
+{-@ lbsLen :: _ -> Nat @-}
+lbsLen :: ByteString -> Int
+lbsLen Empty = 0
+lbsLen (Chunk b bs) = S.bsLen b + lbsLen bs
+
+
 
 instance Eq  ByteString where
     (==)    = eq
@@ -154,27 +178,34 @@ instance Data ByteString where
 ------------------------------------------------------------------------
 -- Packing and unpacking from lists
 
+{-@ packBytes :: cs:_ -> LByteStringN {len cs} @-}
 packBytes :: [Word8] -> ByteString
 packBytes [] = Empty
 packBytes cs0 =
     packChunks 32 cs0
   where
+    {-@ packChunks :: _ -> cs:_ -> {b:_ | lbsLen b = len cs} / [len cs] @-}
     packChunks n cs = case S.packUptoLenBytes n cs of
       (bs, [])  -> chunk bs Empty
       (bs, cs') -> Chunk bs (packChunks (min (n * 2) smallChunkSize) cs')
 
+{-@ packChars :: cs:_ -> LByteStringN {len cs} @-}
 packChars :: [Char] -> ByteString
 packChars [] = Empty
 packChars cs0 = packChunks 32 cs0
   where
+    {-@ packChunks :: _ -> cs:_ -> {b:_ | lbsLen b = len cs} / [len cs] @-}
     packChunks n cs = case S.packUptoLenChars n cs of
       (bs, [])  -> chunk bs Empty
       (bs, cs') -> Chunk bs (packChunks (min (n * 2) smallChunkSize) cs')
 
+
+{-@ unpackBytes :: b:_ -> {v:_ | len v = lbsLen b} @-}
 unpackBytes :: ByteString -> [Word8]
 unpackBytes Empty        = []
 unpackBytes (Chunk c cs) = S.unpackAppendBytesLazy c (unpackBytes cs)
 
+{-@ unpackChars :: b:_ -> {v:_ | len v = lbsLen b} @-}
 unpackChars :: ByteString -> [Char]
 unpackChars Empty        = []
 unpackChars (Chunk c cs) = S.unpackAppendCharsLazy c (unpackChars cs)
@@ -200,12 +231,14 @@ checkInvariant (Chunk c@(S.BS _ len) cs)
 ------------------------------------------------------------------------
 
 -- | Smart constructor for 'Chunk'. Guarantees the data type invariant.
+{-@ chunk :: c:_ -> b:_ -> {v:_ | lbsLen v = bsLen c + lbsLen b} @-}
 chunk :: S.ByteString -> ByteString -> ByteString
 chunk c@(S.BS _ len) cs | len == 0  = cs
                         | otherwise = Chunk c cs
 {-# INLINE chunk #-}
 
 -- | Consume the chunks of a lazy ByteString with a natural right fold.
+{-@ foldrChunks :: (ByteStringNE -> a -> a) -> a -> ByteString -> a @-}
 foldrChunks :: (S.ByteString -> a -> a) -> a -> ByteString -> a
 foldrChunks f z = go
   where go Empty        = z
@@ -235,22 +268,27 @@ foldlChunks f z = go z
 -- and need to share the cache with other programs.
 
 -- | The chunk size used for I\/O. Currently set to 32k, less the memory management overhead
+{-@ assume defaultChunkSize :: Pos @-}
 defaultChunkSize :: Int
 defaultChunkSize = 32 * k - chunkOverhead
    where k = 1024
 
 -- | The recommended chunk size. Currently set to 4k, less the memory management overhead
+{-@ assume smallChunkSize :: Pos @-}
 smallChunkSize :: Int
 smallChunkSize = 4 * k - chunkOverhead
    where k = 1024
 
 -- | The memory management overhead. Currently this is tuned for GHC only.
+{-@ chunkOverhead :: Pos @-}
 chunkOverhead :: Int
 chunkOverhead = 2 * sizeOf (undefined :: Int)
+
 
 ------------------------------------------------------------------------
 -- Implementations for Eq, Ord and Monoid instances
 
+{-@ eq :: a:_ -> b:_ -> _ / [lbsLen a + lbsLen b] @-} 
 eq :: ByteString -> ByteString -> Bool
 eq Empty Empty = True
 eq Empty _     = False
@@ -261,6 +299,7 @@ eq (Chunk a@(S.BS ap al) as) (Chunk b@(S.BS bp bl) bs) =
     EQ -> a == b && eq as bs
     GT -> S.BS ap bl == b && eq (Chunk (S.BS (S.plusForeignPtr ap bl) (al - bl)) as) bs
 
+{-@ cmp :: a:_ -> b:_ -> _ / [lbsLen a + lbsLen b] @-} 
 cmp :: ByteString -> ByteString -> Ordering
 cmp Empty Empty = EQ
 cmp Empty _     = LT
@@ -280,13 +319,25 @@ cmp (Chunk a@(S.BS ap al) as) (Chunk b@(S.BS bp bl) bs) =
 append :: ByteString -> ByteString -> ByteString
 append xs ys = foldrChunks Chunk ys xs
 
+-- TODO:NIKI
+
+{-@ concat :: bs:_ -> LByteStringN {lbsLens bs} @-}
 concat :: [ByteString] -> ByteString
 concat css0 = to css0
   where
-    go Empty        css = to css
+    {-@ go :: b:ByteString -> bs:_ -> LByteStringN {lbsLen b + lbsLens bs} @-}
+    go Empty         [] = Empty
+    go Empty   (cs:css) = go cs css
     go (Chunk c cs) css = Chunk c (go cs css)
+    {-@ to :: bs:_ -> LByteStringN {lbsLens bs} @-}
     to []               = Empty
     to (cs:css)         = go cs css
+
+{-@ measure lbsLens @-}
+{-@ lbsLens :: [ByteString] -> Nat @-}
+lbsLens :: [ByteString] -> Int
+lbsLens []     = 0 
+lbsLens (b:bs) = lbsLen b + lbsLens bs
 
 ------------------------------------------------------------------------
 -- Conversions
