@@ -7,16 +7,15 @@
 [ 4 of 20] Data.ByteString.Builder.Prim.Binary
 [ 5 of 20] >> Data.ByteString.Internal
 [ 6 of 20] >> Data.ByteString.Lazy.Internal
-[ 7 of 20] Data.ByteString.Short.Internal
-  * TODO lots of stuff with funky arrays that we have no specs for
-
+[ 7 of 20] Data.ByteString.Short.Internal <<<------- TODO[1] 
 [ 8 of 20] Data.ByteString.Short
 [ 9 of 20] >> Data.ByteString.Unsafe
-
 [10 of 20] >> Data.ByteString 
-[11 of 20] >> Data.ByteString.Lazy
+
+[11 of 20] >> Data.ByteString.Lazy        <<<------- HEREHEREHERE
 [12 of 20] >> Data.ByteString.Lazy.Char8
 [13 of 20] >> Data.ByteString.Char8
+
 [14 of 20] Data.ByteString.Builder.Prim.Internal.Base16
 [15 of 20] Data.ByteString.Builder.Prim.ASCII
 [16 of 20] Data.ByteString.Builder.Internal
@@ -25,6 +24,7 @@
 [19 of 20] Data.ByteString.Builder.ASCII
 [20 of 20] Data.ByteString.Builder
 
+[1] lots of stuff with funky arrays that we have no specs for
 
 ## 11/1
 
@@ -87,3 +87,12 @@ mkBox f = do
 test :: Int -> IO Box
 test k = mkBox (\_ -> return (k + 100))
 ```
+
+## Interesting Topics
+
+- Initialize plugin
+- Basic memory safety ptr, plusPtr, minusPtr, peek, poke 
+- Data structure invariants (fplen, non-empty chunks)
+- HOF constructors/absref/packUpto
+- Concat lists of bytestrings
+- Termination (eq, cmp) instances

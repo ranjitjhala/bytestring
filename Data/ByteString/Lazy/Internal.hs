@@ -199,7 +199,6 @@ packChars cs0 = packChunks 32 cs0
       (bs, [])  -> chunk bs Empty
       (bs, cs') -> Chunk bs (packChunks (min (n * 2) smallChunkSize) cs')
 
-
 {-@ unpackBytes :: b:_ -> {v:_ | len v = lbsLen b} @-}
 unpackBytes :: ByteString -> [Word8]
 unpackBytes Empty        = []
@@ -361,23 +360,28 @@ toStrict = \cs -> goLen0 cs cs
     -- closures which would result in unnecessary closure allocation.
   where
     -- It's still possible that the result is empty
+    {-@ goLen0 :: bss0:_ -> {bss:_ | lbsLen bss0 = lbsLen bss} -> _ @-}
     goLen0 _   Empty                 = S.BS S.nullForeignPtr 0
     goLen0 cs0 (Chunk (S.BS _ 0) cs) = goLen0 cs0 cs
     goLen0 cs0 (Chunk c cs)          = goLen1 cs0 c cs
 
     -- It's still possible that the result is a single chunk
+    {-@ goLen1 :: bss0:_ -> bs:_ -> {bss:_ | lbsLen bss0 = bsLen bs + lbsLen bss} -> _ @-}
     goLen1 _   bs Empty = bs
     goLen1 cs0 bs (Chunk (S.BS _ 0) cs) = goLen1 cs0 bs cs
     goLen1 cs0 (S.BS _ bl) (Chunk (S.BS _ cl) cs) =
         goLen cs0 (S.checkedAdd "Lazy.concat" bl cl) cs
 
     -- General case, just find the total length we'll need
+    {-@ goLen :: bss0:_ -> total:Nat -> {bss:_ | lbsLen bss0 = lbsLen bss + total} -> _ @-}
+    goLen :: ByteString -> Int -> ByteString -> S.ByteString
     goLen cs0 !total (Chunk (S.BS _ cl) cs) =
       goLen cs0 (S.checkedAdd "Lazy.concat" total cl) cs
     goLen cs0 total Empty =
       S.unsafeCreate total $ \ptr -> goCopy cs0 ptr
 
     -- Copy the data
+    {-@ goCopy :: bs:_ -> {p:_ | lbsLen bs <= PtrSize p}  -> _ @-}
     goCopy Empty                    !_   = return ()
     goCopy (Chunk (S.BS _  0  ) cs) !ptr = goCopy cs ptr
     goCopy (Chunk (S.BS fp len) cs) !ptr = do
