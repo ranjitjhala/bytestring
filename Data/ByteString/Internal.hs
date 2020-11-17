@@ -230,6 +230,7 @@ bsLen :: ByteString -> Int
 bsLen (BS _ l) = l
 
 {-@ type ByteStringN N  = {v : ByteString | bsLen v == N} @-}
+{-@ type ByteStringB B  = ByteStringN {bsLen B}           @-}
 {-@ type ByteStringLN N = {v : ByteString | bsLen v <= N} @-}
 {-@ type ByteStringNE   = {v : ByteString | bsLen v  > 0} @-}
 
@@ -313,9 +314,11 @@ instance Data ByteString where
 ------------------------------------------------------------------------
 -- Packing and unpacking from lists
 
+{-@ packBytes :: xs:_ -> ByteStringN {len xs} @-}
 packBytes :: [Word8] -> ByteString
 packBytes ws = unsafePackLenBytes (List.length ws) ws
 
+{-@ packChars :: xs:_ -> ByteStringN {len xs} @-}
 packChars :: [Char] -> ByteString
 packChars cs = unsafePackLenChars (List.length cs) cs
 
@@ -690,6 +693,7 @@ compareBytes (BS fp1 len1) (BS fp2 len2) =
                     EQ  -> len1 `compare` len2
                     x   -> x
 
+{-@ append :: b1:ByteString -> b2:ByteString -> ByteStringN {bsLen b1 + bsLen b2} @-}
 append :: ByteString -> ByteString -> ByteString
 append (BS _   0)    b                  = b
 append a             (BS _   0)    = a

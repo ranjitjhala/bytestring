@@ -232,8 +232,11 @@ import Data.Bits                (finiteBitSize, shiftL, (.|.), (.&.))
 import Data.Bits                (bitSize, shiftL, (.|.), (.&.))
 #endif
 
-import Data.ByteString.Internal
+import Data.ByteString.Internal 
 import Data.ByteString.Lazy.Internal (fromStrict, toStrict)
+#ifdef LIQUID
+import qualified Data.ByteString.Internal as S 
+#endif
 import Data.ByteString.Unsafe
 
 import qualified Data.List as List
@@ -245,16 +248,28 @@ import Control.Monad            (when)
 
 import Foreign.C.String         (CString, CStringLen)
 import Foreign.C.Types          (CSize)
-import Foreign.ForeignPtr       (ForeignPtr, withForeignPtr, touchForeignPtr)
 #if MIN_VERSION_liquid_base(4,5,0)
 import Foreign.ForeignPtr.Unsafe(unsafeForeignPtrToPtr)
 #else
 import Foreign.ForeignPtr       (unsafeForeignPtrToPtr)
 #endif
-import Foreign.Marshal.Alloc    (allocaBytes)
 import Foreign.Marshal.Array    (allocaArray)
-import Foreign.Ptr
+
+import GHC.Foreign
+#ifdef LIQUID
+import Foreign.Ptr (Ptr) 
+import Data.LiquidPtr
+import GHC.Word (Word64)
+import Foreign.ForeignPtr       (ForeignPtr, touchForeignPtr)
+import Foreign.Storable         (sizeOf)
+import Foreign.Ptr hiding (plusPtr, minusPtr, castPtr) 
+{-@ embed GHC.Word.Word64 as int @-}
+#else
+import Foreign.Marshal.Alloc    (allocaBytes)
+import Foreign.ForeignPtr       (ForeignPtr, withForeignPtr, touchForeignPtr)
+import Foreign.Ptr 
 import Foreign.Storable         (Storable(..))
+#endif
 
 -- hGetBuf and hPutBuf not available in yhc or nhc
 import System.IO                (stdin,stdout,hClose,hFileSize
@@ -285,14 +300,18 @@ import GHC.Word hiding (Word8)
 finiteBitSize = bitSize
 #endif
 
+{- liquid "--diff" @-}
 -- -----------------------------------------------------------------------------
 -- Introducing and eliminating 'ByteString's
 
 -- | /O(1)/ The empty 'ByteString'
+{-@ empty :: ByteStringN 0 @-}
 empty :: ByteString
 empty = BS nullForeignPtr 0
 
 -- | /O(1)/ Convert a 'Word8' into a 'ByteString'
+
+{-@ singleton :: _ -> ByteStringN 1 @-}
 singleton :: Word8 -> ByteString
 singleton c = unsafeCreate 1 $ \p -> poke p c
 {-# INLINE [1] singleton #-}
@@ -322,10 +341,12 @@ singleton c = unsafeCreate 1 $ \p -> poke p c
 --
 -- For applications with large numbers of string literals, 'pack' can be a
 -- bottleneck. In such cases, consider using 'unsafePackAddress' (GHC only).
+{-@ pack :: xs:_ -> ByteStringN {len xs} @-}
 pack :: [Word8] -> ByteString
 pack = packBytes
 
 -- | /O(n)/ Converts a 'ByteString' to a @['Word8']@.
+{- TODO unpack :: b:_ -> {xs:_ | len xs = bsLen b} @-}
 unpack :: ByteString -> [Word8]
 unpack bs = build (unpackFoldr bs)
 {-# INLINE unpack #-}
@@ -346,12 +367,14 @@ unpackFoldr bs k z = foldr k z bs
 -- Basic interface
 
 -- | /O(1)/ Test whether a ByteString is empty.
+{-@ null :: bs:_ -> {v:_ | v <=> (bsLen bs <= 0)} @-}
 null :: ByteString -> Bool
 null (BS _ l) = assert (l >= 0) $ l <= 0
 {-# INLINE null #-}
 
 -- ---------------------------------------------------------------------
 -- | /O(1)/ 'length' returns the length of a ByteString as an 'Int'.
+{-@ length :: b:_ -> {v:Nat | v = bsLen b} @-}
 length :: ByteString -> Int
 length (BS _ l) = assert (l >= 0) l
 {-# INLINE length #-}
@@ -380,6 +403,7 @@ snoc (BS x l) c = unsafeCreate (l+1) $ \p -> withForeignPtr x $ \f -> do
 
 -- | /O(1)/ Extract the first element of a ByteString, which must be non-empty.
 -- An exception will be thrown in the case of an empty ByteString.
+{-@ head :: ByteStringNE -> Word8 @-}
 head :: ByteString -> Word8
 head (BS x l)
     | l <= 0    = errorEmptyList "head"
@@ -388,6 +412,7 @@ head (BS x l)
 
 -- | /O(1)/ Extract the elements after the head of a ByteString, which must be non-empty.
 -- An exception will be thrown in the case of an empty ByteString.
+{-@ tail :: b:ByteStringNE -> ByteStringN {bsLen b - 1} @-}
 tail :: ByteString -> ByteString
 tail (BS p l)
     | l <= 0    = errorEmptyList "tail"
@@ -406,6 +431,7 @@ uncons (BS x l)
 
 -- | /O(1)/ Extract the last element of a ByteString, which must be finite and non-empty.
 -- An exception will be thrown in the case of an empty ByteString.
+{-@ last :: ByteStringNE -> Word8 @-}
 last :: ByteString -> Word8
 last ps@(BS x l)
     | null ps   = errorEmptyList "last"
@@ -415,6 +441,7 @@ last ps@(BS x l)
 
 -- | /O(1)/ Return all the elements of a 'ByteString' except the last one.
 -- An exception will be thrown in the case of an empty ByteString.
+{-@ init :: b:ByteStringNE -> ByteStringN {bsLen b - 1} @-}
 init :: ByteString -> ByteString
 init ps@(BS p l)
     | null ps   = errorEmptyList "init"
@@ -441,10 +468,12 @@ append = mappend
 
 -- | /O(n)/ 'map' @f xs@ is the ByteString obtained by applying @f@ to each
 -- element of @xs@.
+{-@ map :: (Word8 -> Word8) -> b:_ -> ByteStringB b @-}
 map :: (Word8 -> Word8) -> ByteString -> ByteString
 map f (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a ->
     create len $ map_ 0 a
   where
+    {-@ map_ :: n:_ -> _ -> _ -> _ / [len - n] @-}
     map_ :: Int -> Ptr Word8 -> Ptr Word8 -> IO ()
     map_ !n !p1 !p2
        | n >= len = return ()
@@ -455,6 +484,7 @@ map f (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a ->
 {-# INLINE map #-}
 
 -- | /O(n)/ 'reverse' @xs@ efficiently returns the elements of @xs@ in reverse order.
+{-@ reverse :: b:_ -> ByteStringB b @-}
 reverse :: ByteString -> ByteString
 reverse (BS x l) = unsafeCreate l $ \p -> withForeignPtr x $ \f ->
         c_reverse p f (fromIntegral l)
@@ -463,6 +493,7 @@ reverse (BS x l) = unsafeCreate l $ \p -> withForeignPtr x $ \f ->
 -- 'ByteString' and \`intersperses\' that byte between the elements of
 -- the 'ByteString'.  It is analogous to the intersperse function on
 -- Lists.
+{-@ intersperse :: _ -> b:_ -> ByteStringN {2 * (bsLen b) - 1} @-}
 intersperse :: Word8 -> ByteString -> ByteString
 intersperse c ps@(BS x l)
     | length ps < 2  = ps
@@ -2036,6 +2067,7 @@ findIndexOrEnd k (BS x l) =
 
 -- Common up near identical calls to `error' to reduce the number
 -- constant strings created when compiled:
+{-@ errorEmptyList :: {v:_ | False} -> a @-}
 errorEmptyList :: String -> a
 errorEmptyList fun = moduleError fun "empty ByteString"
 {-# NOINLINE errorEmptyList #-}

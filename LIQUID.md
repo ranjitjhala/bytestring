@@ -6,13 +6,14 @@
 [ 3 of 20] Data.ByteString.Builder.Prim.Internal.UncheckedShifts
 [ 4 of 20] Data.ByteString.Builder.Prim.Binary
 [ 5 of 20] >> Data.ByteString.Internal
-[ 6 of 20] >> Data.ByteString.Lazy.Internal
+[ 6 of 20] >> Data.ByteString.Lazy.Internal <<<------- HEREHEREHERE
+
 [ 7 of 20] Data.ByteString.Short.Internal <<<------- TODO[1] 
 [ 8 of 20] Data.ByteString.Short
 [ 9 of 20] >> Data.ByteString.Unsafe
-[10 of 20] >> Data.ByteString 
 
-[11 of 20] >> Data.ByteString.Lazy        <<<------- HEREHEREHERE
+[10 of 20] >> Data.ByteString 
+[11 of 20] >> Data.ByteString.Lazy       
 [12 of 20] >> Data.ByteString.Lazy.Char8
 [13 of 20] >> Data.ByteString.Char8
 
@@ -88,6 +89,12 @@ test :: Int -> IO Box
 test k = mkBox (\_ -> return (k + 100))
 ```
 
+## Issues
+
+- pesky imports (c.f. nonsense with `c_strlen` or https://github.com/ucsd-progsys/liquidhaskell/issues/1795)
+- don't use LIQUID for `ifdef` as it clashes with pragmas
+- `liquid --diff` seems to IGNORE the old errors; clearly `--diff` mode is not working quite right with the plugin.
+
 ## Interesting Topics
 
 - Initialize plugin
@@ -95,4 +102,6 @@ test k = mkBox (\_ -> return (k + 100))
 - Data structure invariants (fplen, non-empty chunks)
 - HOF constructors/absref/packUpto
 - Concat lists of bytestrings
-- Termination (eq, cmp) instances
+- Termination (eq, cmp) instances in BS.Lazy.Internal
+- D.B.errorEmptyList 
+- `null` / `last` and the importance of SPECS for null

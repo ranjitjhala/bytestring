@@ -46,11 +46,12 @@ module Data.ByteString.Short.Internal (
     useAsCStringLen
   ) where
 
-import Data.LiquidPtr
-import Data.ByteString.Internal (ByteString(..), accursedUnutterablePerformIO, c_strlen)
-
 #ifdef LIQUID
+import Data.LiquidPtr
 import Data.ByteString.Internal (ByteString(..), accursedUnutterablePerformIO, c_strlen, bsLen)
+#else
+import Data.ByteString.Internal (ByteString(..), accursedUnutterablePerformIO, c_strlen)
+import Foreign.Marshal.Alloc (allocaBytes)
 #endif
 
 import Data.Typeable    (Typeable)
@@ -70,14 +71,13 @@ import Foreign.C.Types  (CSize(..), CInt(..), CLong(..))
 #else
 import Foreign.C.Types  (CSize, CInt, CLong)
 #endif
-import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.ForeignPtr (touchForeignPtr)
 #if MIN_VERSION_liquid_base(4,5,0)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 #else
 import Foreign.ForeignPtr (unsafeForeignPtrToPtr)
 #endif
-import Foreign.Storable (pokeByteOff)
+-- import Foreign.Storable (pokeByteOff)
 
 #if MIN_VERSION_liquid_base(4,5,0)
 import qualified GHC.Exts
@@ -668,6 +668,7 @@ useAsCString bs action =
       pokeByteOff buf l (0::Word8)
       action buf
   where l = length bs
+
 
 -- | /O(n) construction./ Use a @ShortByteString@ with a function requiring a @CStringLen@.
 -- As for @useAsCString@ this function makes a copy of the original @ShortByteString@.

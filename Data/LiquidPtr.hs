@@ -10,6 +10,7 @@ import qualified GHC.Ptr
 import qualified GHC.ForeignPtr
 import qualified Foreign.Storable
 import qualified Foreign.ForeignPtr
+import qualified Foreign.Marshal.Alloc
 import           GHC.Base (Addr#)
 
 {-@ measure fst3 @-}
@@ -34,11 +35,8 @@ myMax x y = if y <= x then x else y
 
 
 {-@ predicate PtrEnd  P = ((pbase P) + (plen (pbase P))) @-}
-
 {-@ predicate PtrSize P = ((PtrEnd P) - P) @-}
-
 {-@ predicate PtrValid P = ((pbase P) <= P && 0 < PtrSize P) @-}
-
 {-@ predicate PtrValidN P N = ((pbase P) <= P && N < PtrSize P) @-}
 
 {-@ type PtrOk a = {p:Ptr a | PtrValid p} @-}
@@ -59,11 +57,17 @@ withForeignPtr = Foreign.ForeignPtr.withForeignPtr
 peekByteOff :: (Foreign.Storable.Storable a) => GHC.Ptr.Ptr b -> Int -> IO a
 peekByteOff = Foreign.Storable.peekByteOff
 
--- Foreign.Storable.pokeByteOff :: (Foreign.Storable.Storable a)
---                              => forall b. p:(GHC.Ptr.Ptr b)
---                              -> {v:GHC.Types.Int | (PValid p v)}
---                              -> a
---                              -> GHC.Types.IO ()
+{-@ peekElemOff :: (Foreign.Storable.Storable a) => p:(GHC.Ptr.Ptr a) -> {n:Nat | PtrValidN p n} -> IO a @-}
+peekElemOff :: (Foreign.Storable.Storable a) => GHC.Ptr.Ptr a -> Int -> IO a 
+peekElemOff = Foreign.Storable.peekElemOff
+
+{-@ pokeByteOff :: (Foreign.Storable.Storable a) => p:(GHC.Ptr.Ptr b) -> {n:Nat | PtrValidN p n} -> a -> IO () @-}
+pokeByteOff :: (Foreign.Storable.Storable a) => GHC.Ptr.Ptr b -> Int -> a -> IO ()
+pokeByteOff = Foreign.Storable.pokeByteOff
+
+{-@ pokeElemOff :: (Foreign.Storable.Storable a) => p:(GHC.Ptr.Ptr a) -> {n:Nat | PtrValidN p n} -> a -> IO () @-}
+pokeElemOff :: (Foreign.Storable.Storable a) => GHC.Ptr.Ptr a -> Int -> a -> IO ()
+pokeElemOff = Foreign.Storable.pokeElemOff
 
 {-@ peek :: (Foreign.Storable.Storable a) => PtrOk a -> IO a @-}
 peek :: (Foreign.Storable.Storable a) => GHC.Ptr.Ptr a -> IO a
@@ -97,6 +101,10 @@ mkPtr = GHC.Ptr.Ptr
 plusForeignPtr :: GHC.ForeignPtr.ForeignPtr a -> Int -> GHC.ForeignPtr.ForeignPtr b
 plusForeignPtr = GHC.ForeignPtr.plusForeignPtr
 
+
+{-@ allocaBytes :: n:Nat -> (Ptr0 a n -> IO b) -> IO b @-}
+allocaBytes :: Int -> (GHC.Ptr.Ptr a -> IO b) -> IO b
+allocaBytes = Foreign.Marshal.Alloc.allocaBytes
 -------------------
 -- Foreign.Concurrent
 -- newForeignPtr :: GHC.Ptr.Ptr a -> IO () -> IO (GHC.ForeignPtr.ForeignPtr a)
