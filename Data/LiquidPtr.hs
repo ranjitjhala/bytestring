@@ -105,6 +105,11 @@ plusForeignPtr = GHC.ForeignPtr.plusForeignPtr
 {-@ allocaBytes :: n:Nat -> (Ptr0 a n -> IO b) -> IO b @-}
 allocaBytes :: Int -> (GHC.Ptr.Ptr a -> IO b) -> IO b
 allocaBytes = Foreign.Marshal.Alloc.allocaBytes
+
+{-@ unsafeForeignPtrToPtr ::  fp:(GHC.ForeignPtr.ForeignPtr a) -> Ptr0 a (fplen fp) @-}
+unsafeForeignPtrToPtr :: GHC.ForeignPtr.ForeignPtr a -> GHC.Ptr.Ptr a
+unsafeForeignPtrToPtr = GHC.ForeignPtr.unsafeForeignPtrToPtr
+
 -------------------
 -- Foreign.Concurrent
 -- newForeignPtr :: GHC.Ptr.Ptr a -> IO () -> IO (GHC.ForeignPtr.ForeignPtr a)

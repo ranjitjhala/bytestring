@@ -105,3 +105,8 @@ test k = mkBox (\_ -> return (k + 100))
 - Termination (eq, cmp) instances in BS.Lazy.Internal
 - D.B.errorEmptyList 
 - `null` / `last` and the importance of SPECS for null
+
+
+## HEREHEREHEREHERE
+
+- Data/ByteString.hs:522:47: error:

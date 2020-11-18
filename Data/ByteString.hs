@@ -1,3 +1,4 @@
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -248,11 +249,15 @@ import Control.Monad            (when)
 
 import Foreign.C.String         (CString, CStringLen)
 import Foreign.C.Types          (CSize)
+
+#ifndef LIQUID
 #if MIN_VERSION_liquid_base(4,5,0)
 import Foreign.ForeignPtr.Unsafe(unsafeForeignPtrToPtr)
 #else
 import Foreign.ForeignPtr       (unsafeForeignPtrToPtr)
 #endif
+#endif 
+
 import Foreign.Marshal.Array    (allocaArray)
 
 import GHC.Foreign
@@ -300,7 +305,7 @@ import GHC.Word hiding (Word8)
 finiteBitSize = bitSize
 #endif
 
-{- liquid "--diff" @-}
+{-@ liquid "--diff" @-}
 -- -----------------------------------------------------------------------------
 -- Introducing and eliminating 'ByteString's
 
@@ -493,7 +498,7 @@ reverse (BS x l) = unsafeCreate l $ \p -> withForeignPtr x $ \f ->
 -- 'ByteString' and \`intersperses\' that byte between the elements of
 -- the 'ByteString'.  It is analogous to the intersperse function on
 -- Lists.
-{-@ intersperse :: _ -> b:_ -> ByteStringN {2 * (bsLen b) - 1} @-}
+{-@ intersperse :: _ -> b:_ -> {v:_ | bsLen v = if (2 <= bsLen b) then (2 * (bsLen b) - 1) else (bsLen b)} @-}
 intersperse :: Word8 -> ByteString -> ByteString
 intersperse c ps@(BS x l)
     | length ps < 2  = ps
@@ -515,8 +520,9 @@ transpose ps = P.map pack . List.transpose . P.map unpack $ ps
 foldl :: (a -> Word8 -> a) -> a -> ByteString -> a
 foldl f z (BS fp len) = go (end `plusPtr` len)
   where
-    end = (unsafeForeignPtrToPtr fp) `plusPtr` (-1)
+    end = (unsafeForeignPtrToPtr fp) `plusPtr` (-1) :: Ptr Word8
     -- not tail recursive; traverses array right to left
+    {-@ go :: p:PtrMid Word8 {end} {end + len} -> _  / [p - end] @-}
     go !p | p == end  = z
           | otherwise = let !x = accursedUnutterablePerformIO $ do
                                    x' <- peek p
@@ -533,8 +539,9 @@ foldl' f v (BS fp len) =
   where
     g ptr = go v ptr
       where
-        end  = ptr `plusPtr` len
+        end  = ptr `plusPtr` len :: Ptr Word8
         -- tail recursive; traverses array left to right
+        {-@ go :: _ -> p:PtrMid Word8 ptr end -> _  / [end - p] @-}
         go !z !p | p == end  = return z
                  | otherwise = do x <- peek p
                                   go (f z x) (p `plusPtr` 1)
@@ -547,8 +554,9 @@ foldr :: (Word8 -> a -> a) -> a -> ByteString -> a
 foldr k z (BS fp len) = go ptr
   where
     ptr = unsafeForeignPtrToPtr fp
-    end = ptr `plusPtr` len
+    end = ptr `plusPtr` len :: Ptr Word8
     -- not tail recursive; traverses array left to right
+    {-@ go :: p:PtrMid Word8 ptr end -> _  / [end - p] @-}
     go !p | p == end  = z
           | otherwise = let !x = accursedUnutterablePerformIO $ do
                                    x' <- peek p
@@ -564,8 +572,9 @@ foldr' k v (BS fp len) =
   where
     g ptr = go v (end `plusPtr` len)
       where
-        end = ptr `plusPtr` (-1)
+        end = ptr `plusPtr` (-1) :: Ptr Word8
         -- tail recursive; traverses array right to left
+        {-@ go :: _ -> p:PtrMid Word8 {end} {end + len} -> _  / [p - end] @-}
         go !z !p | p == end  = return z
                  | otherwise = do x <- peek p
                                   go (k x z) (p `plusPtr` (-1))
@@ -574,6 +583,7 @@ foldr' k v (BS fp len) =
 -- | 'foldl1' is a variant of 'foldl' that has no starting value
 -- argument, and thus must be applied to non-empty 'ByteString's.
 -- An exception will be thrown in the case of an empty ByteString.
+{-@ foldl1 :: (Word8 -> Word8 -> Word8) -> ByteStringNE -> Word8 @-}
 foldl1 :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
 foldl1 f ps
     | null ps   = errorEmptyList "foldl1"
@@ -582,6 +592,7 @@ foldl1 f ps
 
 -- | 'foldl1'' is like 'foldl1', but strict in the accumulator.
 -- An exception will be thrown in the case of an empty ByteString.
+{-@ foldl1' :: (Word8 -> Word8 -> Word8) -> ByteStringNE -> Word8 @-}
 foldl1' :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
 foldl1' f ps
     | null ps   = errorEmptyList "foldl1'"
@@ -591,6 +602,7 @@ foldl1' f ps
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
 -- and thus must be applied to non-empty 'ByteString's
 -- An exception will be thrown in the case of an empty ByteString.
+{-@ foldr1 :: (Word8 -> Word8 -> Word8) -> ByteStringNE -> Word8 @-}
 foldr1 :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
 foldr1 f ps
     | null ps        = errorEmptyList "foldr1"
@@ -599,6 +611,7 @@ foldr1 f ps
 
 -- | 'foldr1'' is a variant of 'foldr1', but is strict in the
 -- accumulator.
+{-@ foldr1' :: (Word8 -> Word8 -> Word8) -> ByteStringNE -> Word8 @-}
 foldr1' :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
 foldr1' f ps
     | null ps        = errorEmptyList "foldr1"
@@ -626,7 +639,8 @@ any f (BS x len) = accursedUnutterablePerformIO $ withForeignPtr x g
   where
     g ptr = go ptr
       where
-        end = ptr `plusPtr` len
+        end = ptr `plusPtr` len :: Ptr Word8
+        {-@ go :: p:PtrMid Word8 ptr end -> _  / [end - p] @-}
         go !p | p == end  = return False
               | otherwise = do c <- peek p
                                if f c then return True
@@ -666,7 +680,8 @@ all f (BS x len) = accursedUnutterablePerformIO $ withForeignPtr x g
   where
     g ptr = go ptr
       where
-        end = ptr `plusPtr` len
+        end = ptr `plusPtr` len :: Ptr Word8
+        {-@ go :: p:PtrMid Word8 ptr end -> _  / [end - p] @-}
         go !p | p == end  = return True  -- end of list
               | otherwise = do c <- peek p
                                if f c
@@ -695,6 +710,7 @@ all f (BS x len) = accursedUnutterablePerformIO $ withForeignPtr x g
 -- | /O(n)/ 'maximum' returns the maximum value from a 'ByteString'
 -- This function will fuse.
 -- An exception will be thrown in the case of an empty ByteString.
+{-@ maximum :: ByteStringNE -> Word8 @-}
 maximum :: ByteString -> Word8
 maximum xs@(BS x l)
     | null xs   = errorEmptyList "maximum"
@@ -705,6 +721,7 @@ maximum xs@(BS x l)
 -- | /O(n)/ 'minimum' returns the minimum value from a 'ByteString'
 -- This function will fuse.
 -- An exception will be thrown in the case of an empty ByteString.
+{-@ minimum :: ByteStringNE -> Word8 @-}
 minimum :: ByteString -> Word8
 minimum xs@(BS x l)
     | null xs   = errorEmptyList "minimum"
