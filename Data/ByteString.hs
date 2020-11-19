@@ -1169,6 +1169,7 @@ spanByte c ps@(BS x l) =
   where
     g p = go 0
       where
+        {-@ go :: i:_ -> _ / [l - i] @-}
         go !i | i >= l    = return (ps, empty)
               | otherwise = do c' <- peekByteOff p i
                                if c /= c'
@@ -1219,6 +1220,7 @@ spanEnd  p ps = splitAt (findFromEndUntil (not.p) ps) ps
 -- > splitWith (==97) "aabbaca" == ["","","bb","c",""] -- fromEnum 'a' == 97
 -- > splitWith undefined ""     == []                  -- and not [""]
 --
+{-@ lazy splitWith @-}
 splitWith :: (Word8 -> Bool) -> ByteString -> [ByteString]
 splitWith _ (BS _  0) = []
 splitWith predicate (BS fp len) = splitWith0 0 len fp
@@ -1287,6 +1289,7 @@ split w (BS x l) = loop 0
 -- It is a special case of 'groupBy', which allows the programmer to
 -- supply their own equality test. It is about 40% faster than
 -- /groupBy (==)/
+{-@ lazy group @-}
 group :: ByteString -> [ByteString]
 group xs
     | null xs   = []
@@ -1298,9 +1301,8 @@ group xs
 groupBy :: (Word8 -> Word8 -> Bool) -> ByteString -> [ByteString]
 groupBy k xs
     | null xs   = []
-    | otherwise = unsafeTake n xs : groupBy k (unsafeDrop n xs)
-    where
-        n = 1 + findIndexOrEnd (not . k (unsafeHead xs)) (unsafeTail xs)
+    | otherwise = let n = 1 + findIndexOrEnd (not . k (unsafeHead xs)) (unsafeTail xs)
+                  in unsafeTake n xs : groupBy k (unsafeDrop n xs)
 
 -- | /O(n)/ The 'intercalate' function takes a 'ByteString' and a list of
 -- 'ByteString's and concatenates the list after interspersing the first
@@ -1365,6 +1367,7 @@ indexMaybe ps n
 -- element in the given 'ByteString' which is equal to the query
 -- element, or 'Nothing' if there is no such element.
 -- This implementation uses memchr(3).
+{-@ elemIndex :: Word8 -> b:_ -> Maybe {v:Nat | v <= bsLen b} @-}
 elemIndex :: Word8 -> ByteString -> Maybe Int
 elemIndex c (BS x l) = accursedUnutterablePerformIO $ withForeignPtr x $ \p -> do
     q <- memchr p c (fromIntegral l)
@@ -1672,15 +1675,17 @@ breakSubstring pat =
         hp          = rollingHash pat
         m           = k ^ lp
         get = fromIntegral . unsafeIndex src
+        {-@ search :: _ -> i:_ -> _ / [ bsLen src - i ] @-}
         search !hs !i
             | hp == hs && pat == unsafeTake lp b = u
             | length src <= i                    = (src,empty) -- not found
-            | otherwise                          = search hs' (i + 1)
+            | otherwise                          = let hs' = hs * k +
+                                                             get i -
+                                                             m * get (i - lp)
+                                                   in search hs' (i + 1)
           where
             u@(_, b) = unsafeSplitAt (i - lp) src
-            hs' = hs * k +
-                  get i -
-                  m * get (i - lp)
+
     {-# INLINE karpRabin #-}
 
     shift :: ByteString -> (ByteString, ByteString)
@@ -1692,13 +1697,14 @@ breakSubstring pat =
         intoWord = foldl' (\w b -> (w `shiftL` 8) .|. fromIntegral b) 0
         wp   = intoWord pat
         mask = (1 `shiftL` (8 * lp)) - 1
+        {-@ search :: _ -> i:_ -> _ / [bsLen src - i] @-}
         search !w !i
             | w == wp         = unsafeSplitAt (i - lp) src
             | length src <= i = (src, empty)
-            | otherwise       = search w' (i + 1)
-          where
-            b  = fromIntegral (unsafeIndex src i)
-            w' = mask .&. ((w `shiftL` 8) .|. b)
+            | otherwise       = let b  = fromIntegral (unsafeIndex src i)
+                                    w' = mask .&. ((w `shiftL` 8) .|. b)
+                                in 
+                                    search w' (i + 1)
     {-# INLINE shift #-}
 
 -- ---------------------------------------------------------------------

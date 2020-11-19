@@ -72,10 +72,12 @@ import Foreign.C.Types  (CSize(..), CInt(..), CLong(..))
 import Foreign.C.Types  (CSize, CInt, CLong)
 #endif
 import Foreign.ForeignPtr (touchForeignPtr)
+#ifndef LIQUID
 #if MIN_VERSION_liquid_base(4,5,0)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 #else
 import Foreign.ForeignPtr (unsafeForeignPtrToPtr)
+#endif
 #endif
 -- import Foreign.Storable (pokeByteOff)
 
