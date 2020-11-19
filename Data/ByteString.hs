@@ -735,14 +735,16 @@ minimum xs@(BS x l)
 -- 'foldl'; it applies a function to each element of a ByteString,
 -- passing an accumulating parameter from left to right, and returning a
 -- final value of this accumulator together with the new list.
+{-@ mapAccumL :: (acc -> Word8 -> (acc, Word8)) -> acc -> b:_ -> (acc, ByteStringB b) @-}
 mapAccumL :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
 mapAccumL f acc (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a -> do
     gp   <- mallocByteString len
-    acc' <- withForeignPtr gp (go a)
+    acc' <- withForeignPtr gp  (go a)
     return (acc', BS gp len)
   where
     go src dst = mapAccumL_ acc 0
       where
+        {-@ mapAccumL_ :: acc -> n:_ -> _ / [len - n] @-}
         mapAccumL_ !s !n
            | n >= len = return s
            | otherwise = do
@@ -756,6 +758,7 @@ mapAccumL f acc (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a ->
 -- 'foldr'; it applies a function to each element of a ByteString,
 -- passing an accumulating parameter from right to left, and returning a
 -- final value of this accumulator together with the new ByteString.
+{-@ mapAccumR :: (acc -> Word8 -> (acc, Word8)) -> acc -> b:_ -> (acc, ByteStringB b) @-}
 mapAccumR :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
 mapAccumR f acc (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a -> do
     gp   <- mallocByteString len
@@ -764,6 +767,7 @@ mapAccumR f acc (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a ->
   where
     go src dst = mapAccumR_ acc (len-1)
       where
+        {-@ mapAccumR_ :: acc -> {n:_ | (0 - 1) <= n && n < len } -> _ / [ n + 1] @-}
         mapAccumR_ !s (-1) = return s
         mapAccumR_ !s !n   = do
             x  <- peekByteOff src n
@@ -785,6 +789,7 @@ mapAccumR f acc (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a ->
 -- > head (scanl f z xs) == z
 -- > last (scanl f z xs) == foldl f z xs
 --
+{-@ scanl :: _ -> _ -> b:_ -> ByteStringN {bsLen b + 1} @-}
 scanl
     :: (Word8 -> Word8 -> Word8)
     -- ^ accumulator -> element -> new accumulator
@@ -801,6 +806,7 @@ scanl f v (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a ->
   where
     go src dst = scanl_ v 0
       where
+        {-@ scanl_ :: Word8 -> n:_  -> _ / [len - n] @-}
         scanl_ !z !n
             | n >= len  = return ()
             | otherwise = do
@@ -818,9 +824,10 @@ scanl f v (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a ->
 -- This function will fuse.
 --
 -- > scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
+{-@ scanl1 :: _ -> b:_ -> ByteStringB b @-}
 scanl1 :: (Word8 -> Word8 -> Word8) -> ByteString -> ByteString
 scanl1 f ps
-    | null ps   = empty
+    | null ps   =  empty
     | otherwise = scanl f (unsafeHead ps) (unsafeTail ps)
 {-# INLINE scanl1 #-}
 
@@ -834,6 +841,7 @@ scanl1 f ps
 -- > head (scanr f z xs) == foldr f z xs
 -- > last (scanr f z xs) == z
 --
+{-@ scanr :: _ -> _ -> b:_ -> ByteStringN {bsLen b + 1} @-}
 scanr
     :: (Word8 -> Word8 -> Word8)
     -- ^ element -> accumulator -> new accumulator
@@ -850,6 +858,7 @@ scanr f v (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a ->
   where
     go p q = scanr_ v (len-1)
       where
+        {-@ scanr_ :: _ -> n:_ -> _ / [n+1] @-}
         scanr_ !z !n
             | n < 0     = return ()
             | otherwise = do
@@ -860,6 +869,7 @@ scanr f v (BS fp len) = unsafeDupablePerformIO $ withForeignPtr fp $ \a ->
 {-# INLINE scanr #-}
 
 -- | 'scanr1' is a variant of 'scanr' that has no starting value argument.
+{-@ scanr1 :: _ -> b:_ -> ByteStringB b @-}
 scanr1 :: (Word8 -> Word8 -> Word8) -> ByteString -> ByteString
 scanr1 f ps
     | null ps   = empty
@@ -894,6 +904,7 @@ replicate w c
 -- >    unfoldr (\x -> if x <= 5 then Just (x, x + 1) else Nothing) 0
 -- > == pack [0, 1, 2, 3, 4, 5]
 --
+{-@ lazy unfoldr @-}
 unfoldr :: (a -> Maybe (Word8, a)) -> a -> ByteString
 unfoldr f = concat . unfoldChunk 32 64
   where unfoldChunk n n' x =
@@ -916,6 +927,8 @@ unfoldrN i f x0
     | i < 0     = (empty, Just x0)
     | otherwise = unsafePerformIO $ createAndTrim' i $ \p -> go p x0 0
   where
+    {-@ go :: {p:Ptr Word8 | pbase p <= p} -> a -> {n:Nat | n <= i && PtrSize p = i - n} -> IO {v:_ | fst3 v = 0 && snd3 v <= i} / [i - n] @-}
+    go :: Ptr Word8 -> _ 
     go !p !x !n
       | n == i    = return (0, n, Just x)
       | otherwise = case f x of
@@ -929,6 +942,7 @@ unfoldrN i f x0
 
 -- | /O(1)/ 'take' @n@, applied to a ByteString @xs@, returns the prefix
 -- of @xs@ of length @n@, or @xs@ itself if @n > 'length' xs@.
+{-@ take :: n:Nat -> b:_ -> ByteStringN {myMin n (bsLen b)} @-}
 take :: Int -> ByteString -> ByteString
 take n ps@(BS x l)
     | n <= 0    = empty
@@ -945,6 +959,7 @@ take n ps@(BS x l)
 -- ""
 -- >>> takeEnd 4 "abc"
 -- "abc"
+{-@ takeEnd :: n:Nat -> b:_ -> ByteStringN {myMin n (bsLen b)} @-}
 takeEnd :: Int -> ByteString -> ByteString
 takeEnd n ps@(BS x len)
   | n >= len  = ps
@@ -954,6 +969,7 @@ takeEnd n ps@(BS x len)
 
 -- | /O(1)/ 'drop' @n xs@ returns the suffix of @xs@ after the first @n@
 -- elements, or @[]@ if @n > 'length' xs@.
+{-@ drop  :: n:Nat -> b:_ -> ByteStringN {(bsLen b) - (myMin n (bsLen b))} @-}
 drop  :: Int -> ByteString -> ByteString
 drop n ps@(BS x l)
     | n <= 0    = ps
@@ -970,6 +986,7 @@ drop n ps@(BS x l)
 -- "abcdefg"
 -- >>> dropEnd 4 "abc"
 -- ""
+{-@ dropEnd  :: n:Nat -> b:_ -> ByteStringN {(bsLen b) - (myMin n (bsLen b))} @-}
 dropEnd :: Int -> ByteString -> ByteString
 dropEnd n ps@(BS x len)
     | n <= 0    = ps
@@ -978,6 +995,7 @@ dropEnd n ps@(BS x len)
 {-# INLINE dropEnd #-}
 
 -- | /O(1)/ 'splitAt' @n xs@ is equivalent to @('take' n xs, 'drop' n xs)@.
+{-@ splitAt :: n:Nat -> b:_ -> (ByteStringN {myMin n (bsLen b)}, ByteStringN {(bsLen b) - (myMin n (bsLen b))}) @-}
 splitAt :: Int -> ByteString -> (ByteString, ByteString)
 splitAt n ps@(BS x l)
     | n <= 0    = (empty, ps)
@@ -988,6 +1006,7 @@ splitAt n ps@(BS x l)
 -- | Similar to 'P.takeWhile',
 -- returns the longest (possibly empty) prefix of elements
 -- satisfying the predicate.
+{-@ takeWhile :: _ -> b:_ -> ByteStringLN {bsLen b} @-}
 takeWhile :: (Word8 -> Bool) -> ByteString -> ByteString
 takeWhile f ps = unsafeTake (findIndexOrEnd (not . f) ps) ps
 {-# INLINE [1] takeWhile #-}
@@ -1022,6 +1041,7 @@ takeWhile f ps = unsafeTake (findIndexOrEnd (not . f) ps) ps
 -- @'takeWhileEnd' p@ is equivalent to @'reverse' . 'takeWhile' p . 'reverse'@.
 --
 -- @since 0.10.12.0
+{-@ takeWhileEnd :: _ -> b:_ -> ByteStringLN {bsLen b} @-}
 takeWhileEnd :: (Word8 -> Bool) -> ByteString -> ByteString
 takeWhileEnd f ps = unsafeDrop (findFromEndUntil (not . f) ps) ps
 {-# INLINE takeWhileEnd #-}
@@ -1029,6 +1049,7 @@ takeWhileEnd f ps = unsafeDrop (findFromEndUntil (not . f) ps) ps
 -- | Similar to 'P.dropWhile',
 -- drops the longest (possibly empty) prefix of elements
 -- satisfying the predicate and returns the remainder.
+{-@ dropWhile :: _ -> b:_ -> ByteStringLN {bsLen b} @-}
 dropWhile :: (Word8 -> Bool) -> ByteString -> ByteString
 dropWhile f ps = unsafeDrop (findIndexOrEnd (not . f) ps) ps
 {-# INLINE [1] dropWhile #-}
@@ -1064,6 +1085,7 @@ dropWhile f ps = unsafeDrop (findIndexOrEnd (not . f) ps) ps
 -- @'dropWhileEnd' p@ is equivalent to @'reverse' . 'dropWhile' p . 'reverse'@.
 --
 -- @since 0.10.12.0
+{-@ dropWhileEnd :: _ -> b:_ -> ByteStringLN {bsLen b} @-}
 dropWhileEnd :: (Word8 -> Bool) -> ByteString -> ByteString
 dropWhileEnd f ps = unsafeTake (findFromEndUntil (not . f) ps) ps
 {-# INLINE dropWhileEnd #-}
@@ -2069,9 +2091,10 @@ appendFile = modifyFile AppendMode
 
 -- | 'findIndexOrEnd' is a variant of findIndex, that returns the length
 -- of the string if no element is found, rather than Nothing.
+{-@ findIndexOrEnd :: (Word8 -> Bool) -> b:_ -> {v:Nat | v <= bsLen b} @-}
 findIndexOrEnd :: (Word8 -> Bool) -> ByteString -> Int
 findIndexOrEnd k (BS x l) =
-    accursedUnutterablePerformIO $ withForeignPtr x g
+    accursedUnutterablePerformIO $  withForeignPtr x g
   where
     g ptr = go 0
       where

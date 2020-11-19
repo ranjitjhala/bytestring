@@ -652,7 +652,7 @@ createAndTrim l f = do
 {-# INLINE createAndTrim #-}
 
 
-{-@ createAndTrim' :: l:Nat -> (p:Ptr Word8 -> IO {v:(Nat, {l':Nat | l' <= l}, a) | fst3 v + snd3 v <= PtrSize p}) -> IO (ByteStringLN l, a) @-}
+{-@ createAndTrim' :: l:Nat -> (p:Ptr0 Word8 l -> IO {v:(Nat, {l':Nat | l' <= l}, a) | fst3 v + snd3 v <= PtrSize p}) -> IO (ByteStringLN l, a) @-}
 createAndTrim' :: Int -> (Ptr Word8 -> IO (Int, Int, a)) -> IO (ByteString, a)
 createAndTrim' l f = do
     fp <- mallocByteString l
