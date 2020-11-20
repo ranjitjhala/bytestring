@@ -73,13 +73,15 @@ import Foreign.C.Types  (CSize, CInt, CLong)
 #endif
 import Foreign.ForeignPtr (touchForeignPtr)
 #ifndef LIQUID
+import Data.LiquidPtr (unsafeError)
+import Foreign.Storable (pokeByteOff)
 #if MIN_VERSION_liquid_base(4,5,0)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 #else
 import Foreign.ForeignPtr (unsafeForeignPtrToPtr)
 #endif
 #endif
--- import Foreign.Storable (pokeByteOff)
+
 
 #if MIN_VERSION_liquid_base(4,5,0)
 import qualified GHC.Exts

@@ -106,7 +106,31 @@ test k = mkBox (\_ -> return (k + 100))
 - D.B.errorEmptyList 
 - `null` / `last` and the importance of SPECS for null
 
+- partition is NUTS
 
 ## HEREHEREHEREHERE
 
-- Data/ByteString.hs:522:47: error:
+save & wipe clean 
+
+  cabal v2-build bytestring-lh:lib:bs-lh > log.0 2>&1
+
+produces 20+ errors
+
+rerun without modification (but 'touch' Bytestring.hs)
+
+  cabal v2-build bytestring-lh:lib:bs-lh > log.1 2>&1
+
+still produces 20+ errors
+
+rerun after editing `filter` (e.g. line `1511`)
+
+  cabal v2-build bytestring-lh:lib:bs-lh > log.2 2>&1
+
+? what happened to OTHER errors?
+
+aargh. says SAFE and crashes on _next_ module.
+
+## Audit
+ignore
+lazy
+assume 

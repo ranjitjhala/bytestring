@@ -239,11 +239,21 @@ import System.IO                (Handle,openBinaryFile,stdin,stdout,withBinaryFi
 import System.IO.Error          (mkIOError, illegalOperationErrorType)
 import System.IO.Unsafe
 
+#ifdef LIQUID
+import Data.LiquidPtr
+import GHC.Word (Word64)
+{-@ embed GHC.Word.Word64 as int @-}
+import Foreign.ForeignPtr       (ForeignPtr, touchForeignPtr)
+import Foreign.Storable         (sizeOf)
+import Foreign.Ptr              hiding (nullPtr, plusPtr, minusPtr, castPtr) 
+import Data.Int                 (Int32)
+#else
 import Foreign.ForeignPtr       (withForeignPtr)
 import Foreign.Ptr
 import Foreign.Storable
+#endif
 
-
+{-@ liquid "--diff" @-}
 -- -----------------------------------------------------------------------------
 -- Introducing and eliminating 'ByteString's
 

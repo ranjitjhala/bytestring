@@ -11,6 +11,7 @@ import qualified GHC.ForeignPtr
 import qualified Foreign.Storable
 import qualified Foreign.ForeignPtr
 import qualified Foreign.Marshal.Alloc
+import qualified Foreign.C.String
 import           GHC.Base (Addr#)
 
 {-@ measure fst3 @-}
@@ -32,7 +33,7 @@ myMax x y = if y <= x then x else y
 {-@ embed GHC.Ptr.Ptr *         as int @-}
 {-@ embed Foreign.C.Types.CSize as int @-}
 {-@ embed GHC.Word.Word64       as int @-}
-
+{-@ embed GHC.Int.Int32         as int @-}
 
 {-@ predicate PtrEnd  P = ((pbase P) + (plen (pbase P))) @-}
 {-@ predicate PtrSize P = ((PtrEnd P) - P) @-}
@@ -49,7 +50,9 @@ myMax x y = if y <= x then x else y
 newForeignPtr_ :: GHC.Ptr.Ptr a -> IO (Foreign.ForeignPtr.ForeignPtr a)
 newForeignPtr_ = GHC.ForeignPtr.newForeignPtr_
 
-{-@ withForeignPtr ::  fp:(GHC.ForeignPtr.ForeignPtr a) -> ((Ptr0 a (fplen fp)) -> IO b) -> IO b @-}
+{-@ measure ofForeignPtr :: GHC.ForeignPtr.ForeignPtr a -> GHC.Ptr.Ptr a @-}
+
+{-@ withForeignPtr ::  fp:(GHC.ForeignPtr.ForeignPtr a) -> ( {v:Ptr0 a (fplen fp) | v = ofForeignPtr fp} -> IO b) -> IO b @-}
 withForeignPtr :: GHC.ForeignPtr.ForeignPtr a -> (GHC.Ptr.Ptr a -> IO b) -> IO b
 withForeignPtr = Foreign.ForeignPtr.withForeignPtr
 
@@ -76,14 +79,19 @@ peek     = Foreign.Storable.peek
 {-@ poke :: (Foreign.Storable.Storable a) => PtrOk a -> a -> IO () @-}
 poke :: (Foreign.Storable.Storable a) => GHC.Ptr.Ptr a -> a -> IO ()
 poke     = Foreign.Storable.poke
+
 -- 
+
+{-@ nullPtr :: {v:Ptr a | v = 0} @-}
+nullPtr :: GHC.Ptr.Ptr a
+nullPtr = GHC.Ptr.nullPtr
 
 {-@ castPtr :: p:_ -> {q:_ | q = p} @-}
 castPtr :: GHC.Ptr.Ptr a -> GHC.Ptr.Ptr b
 castPtr  = GHC.Ptr.castPtr
 
-{-@ plusPtr :: p:GHC.Ptr.Ptr a -> off:Int -> {v:(Ptr b) | v = p + off && pbase v = pbase p} @-}
-plusPtr :: GHC.Ptr.Ptr a -> Int -> GHC.Ptr.Ptr b
+{-@ plusPtr :: p:GHC.Ptr.Ptr a -> off:Int -> {v:(Ptr a) | v = p + off && pbase v = pbase p} @-}
+plusPtr :: GHC.Ptr.Ptr a -> Int -> GHC.Ptr.Ptr a
 plusPtr  = GHC.Ptr.plusPtr
 
 {-@ minusPtr :: q:(Ptr a) -> {p:(Ptr b) | pbase p == pbase q} -> {v:Nat | v == q - p } @-}
@@ -110,6 +118,7 @@ allocaBytes = Foreign.Marshal.Alloc.allocaBytes
 unsafeForeignPtrToPtr :: GHC.ForeignPtr.ForeignPtr a -> GHC.Ptr.Ptr a
 unsafeForeignPtrToPtr = GHC.ForeignPtr.unsafeForeignPtrToPtr
 
+{-@ type CStringLenOk = {v:Foreign.C.String.CStringLen | 0 <= snd v && snd v <= PtrSize (fst v)} @-}
 -------------------
 -- Foreign.Concurrent
 -- newForeignPtr :: GHC.Ptr.Ptr a -> IO () -> IO (GHC.ForeignPtr.ForeignPtr a)

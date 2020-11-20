@@ -640,7 +640,7 @@ createUptoN' l f = do
 -- createAndTrim is the main mechanism for creating custom, efficient
 -- ByteString functions, using Haskell or C functions to fill the space.
 --
-{-@ createAndTrim :: l:Nat -> (Ptr Word8 -> IO {l':Nat | l' <= l}) -> IO (ByteStringLN l) @-}
+{-@ createAndTrim :: l:Nat -> (Ptr0 Word8 l -> IO {l':Nat | l' <= l}) -> IO (ByteStringLN l) @-}
 createAndTrim :: Int -> (Ptr Word8 -> IO Int) -> IO ByteString
 createAndTrim l f = do
     fp <- mallocByteString l
@@ -868,6 +868,7 @@ foreign import ccall unsafe "static stdlib.h &free" c_free_finalizer
 foreign import ccall unsafe "string.h memchr" c_memchr
     :: Ptr Word8 -> CInt -> CSize -> IO (Ptr Word8)
 
+{-@ assume memchr :: p:_ -> _ -> n:_ -> IO ({q:_ | q = 0 || (pbase q = pbase p && p <= q && q < p + n)}) @-}
 memchr :: Ptr Word8 -> Word8 -> CSize -> IO (Ptr Word8)
 memchr p w s = c_memchr p (fromIntegral w) s
 
